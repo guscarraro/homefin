@@ -1,15 +1,19 @@
 import jwt from 'jsonwebtoken'
 
 export function auth(req, res, next) {
-  const token = req.headers.authorization?.split(' ')[1]
+  const authHeader = req.headers.authorization
 
-  if (!token) return res.sendStatus(401)
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Token não informado' })
+  }
+
+  const [, token] = authHeader.split(' ')
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET)
     req.user = decoded
-    next()
+    return next()
   } catch {
-    return res.sendStatus(401)
+    return res.status(401).json({ error: 'Token inválido' })
   }
 }
