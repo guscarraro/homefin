@@ -162,6 +162,7 @@ function getMonthlyGoalsNeed(goals) {
 function getTotals(entriesForMonth, fixedCosts, monthKey) {
   let variableExpenses = 0
   let investments = 0
+  let goalPayments = 0
 
   for (const entry of entriesForMonth) {
     const amount = Number(entry.visibleAmount || entry.amount || 0)
@@ -169,6 +170,10 @@ function getTotals(entriesForMonth, fixedCosts, monthKey) {
     if (entry.type === 'investment') {
       investments += amount
       continue
+    }
+
+    if (entry.category === 'Meta') {
+      goalPayments += amount
     }
 
     variableExpenses += amount
@@ -180,6 +185,7 @@ function getTotals(entriesForMonth, fixedCosts, monthKey) {
     fixedCosts: Number(fixedCostsTotal.toFixed(2)),
     variableExpenses: Number(variableExpenses.toFixed(2)),
     investments: Number(investments.toFixed(2)),
+    goalPayments: Number(goalPayments.toFixed(2)),
     expenses: Number((fixedCostsTotal + variableExpenses).toFixed(2))
   }
 }
@@ -407,6 +413,7 @@ export function buildMonthlyProjection(financeData, monthKey) {
     fixedCosts: totals.fixedCosts,
     variableExpenses: totals.variableExpenses,
     investments: totals.investments,
+    goalPayments: totals.goalPayments,
     investmentSuggested,
     recommendedInvestment,
     aggressiveInvestment,
@@ -475,7 +482,7 @@ export function buildSuggestions(projection, goals) {
         text: `Além do piso, ainda foi colocado ${projection.investedAboveMinimum.toLocaleString('pt-BR', {
           style: 'currency',
           currency: 'BRL'
-        })} acima da meta mínima. Bonito, elegante e disciplinado.`
+        })} acima da meta mínima.`
       })
     }
   } else {
@@ -490,23 +497,6 @@ export function buildSuggestions(projection, goals) {
       })} para alcançar os 10% mínimos de aporte do mês.`
     })
   }
-
-  items.push({
-    id: 'investment-training',
-    tone: 'default',
-    icon: 'shield',
-    title: 'Régua ideal de aporte',
-    text: `Piso: ${projection.investmentSuggested.toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    })}. Recomendado: ${projection.recommendedInvestment.toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    })}. Forte: ${projection.aggressiveInvestment.toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    })}.`
-  })
 
   if (projection.monthlyGoalsNeed > 0) {
     items.push({
@@ -527,117 +517,13 @@ export function buildSuggestions(projection, goals) {
     })
   }
 
-  items.push({
-    id: 'market-budget',
-    tone: projection.marketSpent > projection.marketBudget ? 'warning' : 'default',
-    icon: 'food',
-    title: 'Mercado',
-    text: `Teto saudável: ${projection.marketBudget.toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    })}. Gasto atual: ${projection.marketSpent.toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    })}.`
-  })
-
-  items.push({
-    id: 'food-budget',
-    tone: projection.foodSpent > projection.foodBudget ? 'warning' : 'default',
-    icon: 'coffee',
-    title: 'Alimentação fora',
-    text: `Teto saudável: ${projection.foodBudget.toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    })}. Gasto atual: ${projection.foodSpent.toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    })}.`
-  })
-
-  items.push({
-    id: 'leisure-budget',
-    tone: projection.leisureSpent > projection.leisureBudget ? 'warning' : 'default',
-    icon: 'trend',
-    title: 'Lazer',
-    text: `Teto saudável: ${projection.leisureBudget.toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    })}. Gasto atual: ${projection.leisureSpent.toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    })}.`
-  })
-
-  items.push({
-    id: 'transport-budget',
-    tone: projection.transportSpent > projection.transportBudget ? 'warning' : 'default',
-    icon: 'calendar',
-    title: 'Transporte',
-    text: `Teto saudável: ${projection.transportBudget.toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    })}. Gasto atual: ${projection.transportSpent.toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    })}.`
-  })
-
-  items.push({
-    id: 'weekly-control',
-    tone: 'default',
-    icon: 'calendar',
-    title: 'Controle do restante do mês',
-    text: `Depois dos compromissos do mês, a régua fica em ${projection.weeklyBudget.toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    })} por semana e ${projection.dailyLimit.toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    })} por dia.`
-  })
-
-  if (projection.availableAfterGoals < 0) {
-    items.push({
-      id: 'month-negative-after-goals',
-      tone: 'danger',
-      icon: 'danger',
-      title: 'O mês está pressionado',
-      text: 'No ritmo atual, o ideal é cortar primeiro compras soltas, alimentação fora e lazer até o saldo voltar a respirar.'
-    })
-  } else {
-    items.push({
-      id: 'month-positive-after-goals',
-      tone: 'success',
-      icon: 'shield',
-      title: 'Ainda existe respiro',
-      text: `Depois dos compromissos, ainda sobram ${projection.availableAfterGoals.toLocaleString('pt-BR', {
-        style: 'currency',
-        currency: 'BRL'
-      })}.`
-    })
-  }
-
-  if (projection.nextMonthInstallments > 0) {
-    items.push({
-      id: 'next-month-installments',
-      tone: 'warning',
-      icon: 'calendar',
-      title: 'Próximo mês já começa pressionado',
-      text: `O próximo mês já nasce com ${projection.nextMonthInstallments.toLocaleString('pt-BR', {
-        style: 'currency',
-        currency: 'BRL'
-      })} em parcelas.`
-    })
-  }
-
   if (goals?.length) {
     items.push({
       id: 'routine-advice',
       tone: 'default',
       icon: 'target',
       title: 'Ordem ideal do dinheiro',
-      text: 'Paga o fixo, garante aporte, separa metas, respeita tetos variáveis e só depois libera o resto. A matemática não gosta de emoção.'
+      text: 'Paga o fixo, garante aporte, separa metas, respeita tetos variáveis e só depois libera o resto.'
     })
   }
 
@@ -781,6 +667,10 @@ export function getProjectionDonutData(projection) {
       value: Number(projection.investments.toFixed(2))
     },
     {
+      name: 'Metas',
+      value: Number(projection.goalPayments.toFixed(2))
+    },
+    {
       name: 'Mercado',
       value: Number(projection.marketSpent.toFixed(2))
     },
@@ -828,15 +718,22 @@ export function getMonthlyEntriesList(financeData, monthKey) {
   const entryItems = getEntriesForMonthView(financeData.entries || [], monthKey)
 
   for (const entry of entryItems) {
+    const isGoalPayment = entry.category === 'Meta'
+
     result.push({
       ...entry,
       sourceType: 'entry',
       originalId: entry.id,
-      title: entry.category || 'Geral',
+      title: isGoalPayment ? 'Pagamento de meta' : entry.category || 'Geral',
       displayNote: entry.note || 'Sem observação',
       displayAmount: Number(entry.visibleAmount || entry.amount || 0),
       displayDate: entry.date,
-      entryKindLabel: entry.type === 'investment' ? 'Investimento' : 'Despesa variável',
+      entryKindLabel:
+        entry.type === 'investment'
+          ? 'Investimento'
+          : isGoalPayment
+            ? 'Pagamento de meta'
+            : 'Despesa variável',
       recurrenceLabel: entry.isRecurring ? 'Recorrente' : 'Avulso'
     })
   }
@@ -862,6 +759,32 @@ export function getMonthlyEntriesList(financeData, monthKey) {
       dueDay: Number(fixedCost.dueDay || 1),
       entryKindLabel: 'Custo fixo',
       recurrenceLabel: 'Mensal'
+    })
+  }
+
+  for (const salary of financeData.salaries || []) {
+    if (salary.month !== monthKey) {
+      continue
+    }
+
+    result.push({
+      id: `salary-view-${salary.id || salary.month}`,
+      originalId: salary.id || salary.month,
+      sourceType: 'salary',
+      title: 'Salário do mês',
+      category: 'Receita',
+      displayNote: `Gustavo: ${Number(salary.gustavo || 0).toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      })} • Marccella: ${Number(salary.marccella || 0).toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      })}`,
+      displayAmount: Number(salary.amount || 0),
+      displayDate: `${salary.month}-01`,
+      entryKindLabel: 'Receita',
+      recurrenceLabel: 'Mensal',
+      type: 'income'
     })
   }
 

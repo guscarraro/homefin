@@ -5,12 +5,27 @@ import StyledSelect from '../common/StyledSelect'
 import Button from '../common/Button'
 import { ACCOUNTS, CATEGORIES, PAYMENT_METHODS } from '../../services/mockData'
 import { useFinance } from '../../context/FinanceContext'
-import { useUser } from '../../context/UserContext'
 
 const Form = styled.form`
   display: flex;
   flex-direction: column;
   gap: 12px;
+`
+
+const NativeSelect = styled.select`
+  width: 100%;
+  min-height: 52px;
+  border-radius: 16px;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  background: ${({ theme }) => theme.colors.surfaceAlt};
+  color: ${({ theme }) => theme.colors.text};
+  padding: 0 14px;
+  font-size: 15px;
+  outline: none;
+
+  &:focus {
+    border-color: ${({ theme }) => theme.colors.primary};
+  }
 `
 
 const ToggleBox = styled.label`
@@ -31,7 +46,7 @@ const Hint = styled.div`
   background: ${({ theme }) => theme.colors.primarySoft};
   color: ${({ theme }) => theme.colors.text};
   font-size: 14px;
-  line-height: 1.4;
+  line-height: 1.45;
 `
 
 function getSelectValue(value) {
@@ -41,18 +56,23 @@ function getSelectValue(value) {
 }
 
 function ExpenseForm() {
-  const { addEntry } = useFinance()
-  const { selectedUser } = useUser()
+  const { addEntry, financeData } = useFinance()
 
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('')
   const [account, setAccount] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('')
   const [note, setNote] = useState('')
+  const [goalId, setGoalId] = useState('')
   const [isInstallment, setIsInstallment] = useState(false)
   const [installmentCount, setInstallmentCount] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  function handleSubmit(event) {
+  const isInvestment = category === 'Investimento'
+  const isGoalPayment = category === 'Meta'
+  const allowInstallment = !isInvestment && !isGoalPayment
+
+  async function handleSubmit(event) {
     event.preventDefault()
 
     const parsedAmount = Number(String(amount).replace(',', '.'))
@@ -78,80 +98,107 @@ function ExpenseForm() {
       return
     }
 
-    if (isInstallment && parsedInstallments < 2) {
+    if (isGoalPayment && !goalId) {
+      alert('Selecione qual meta recebeu esse valor')
+      return
+    }
+
+    if (allowInstallment && isInstallment && parsedInstallments < 2) {
       alert('Se foi parcelado, informe ao menos 2 parcelas')
       return
     }
 
-    addEntry({
-      amount: parsedAmount,
-      category,
-      account,
-      paymentMethod,
-      note,
-      userId: selectedUser,
-      date: new Date().toISOString().slice(0, 10),
-      isInstallment,
-      installmentCount: isInstallment ? parsedInstallments : 1
-    })
+    try {
+      setLoading(true)
 
-    setAmount('')
-    setCategory('')
-    setAccount('')
-    setPaymentMethod('')
-    setNote('')
-    setIsInstallment(false)
-    setInstallmentCount('')
+      await addEntry({
+        amount: parsedAmount,
+        category,
+        account,
+        paymentMethod,
+        note: note.trim(),
+        date: new Date().toISOString().slice(0, 10),
+        isInstallment: allowInstallment ? isInstallment : false,
+        installmentCount: allowInstallment && isInstallment ? parsedInstallments : 1,
+        goalId: isGoalPayment ? goalId : null
+      })
+
+      setAmount('')
+      setCategory('')
+      setAccount('')
+      setPaymentMethod('')
+      setNote('')
+      setGoalId('')
+      setIsInstallment(false)
+      setInstallmentCount('')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
     <Form onSubmit={handleSubmit}>
       <Input
-        placeholder="Valor da compra ou aporte"
+        placeholder="Valor do lançamento"
         inputMode="decimal"
         value={amount}
-        onChange={e => setAmount(e.target.value)}
+        onChange={event => setAmount(event.target.value)}
       />
 
       <StyledSelect
         options={CATEGORIES}
         value={category}
-        onChange={v => setCategory(getSelectValue(v))}
+        onChange={value => setCategory(getSelectValue(value))}
         placeholder="Categoria"
       />
+
+      {isGoalPayment && (
+        <NativeSelect
+          value={goalId}
+          onChange={event => setGoalId(event.target.value)}
+        >
+          <option value="">Qual meta foi paga?</option>
+
+          {(financeData.goals || []).map(goal => (
+            <option key={goal.id} value={goal.id}>
+              {goal.title}
+            </option>
+          ))}
+        </NativeSelect>
+      )}
 
       <StyledSelect
         options={ACCOUNTS}
         value={account}
-        onChange={v => setAccount(getSelectValue(v))}
+        onChange={value => setAccount(getSelectValue(value))}
         placeholder="Conta / banco"
       />
 
       <StyledSelect
         options={PAYMENT_METHODS}
         value={paymentMethod}
-        onChange={v => setPaymentMethod(getSelectValue(v))}
+        onChange={value => setPaymentMethod(getSelectValue(value))}
         placeholder="Forma de pagamento"
       />
 
-      {category !== 'Investimento' && (
+      {allowInstallment && (
         <ToggleBox>
           <input
             type="checkbox"
             checked={isInstallment}
-            onChange={e => setIsInstallment(e.target.checked)}
+            onChange={event => setIsInstallment(event.target.checked)}
           />
           <span>Foi parcelado?</span>
         </ToggleBox>
       )}
 
-      {isInstallment && category !== 'Investimento' && (
+      {allowInstallment && isInstallment && (
         <>
           <Input
             placeholder="Quantas parcelas?"
             inputMode="numeric"
             value={installmentCount}
-            onChange={e => setInstallmentCount(e.target.value)}
+            onChange={event => setInstallmentCount(event.target.value)}
           />
 
           {paymentMethod === 'Crédito' ? (
@@ -162,19 +209,27 @@ function ExpenseForm() {
         </>
       )}
 
-      {category === 'Investimento' && (
+      {isInvestment && (
         <Hint>
-          Lançando em “Investimento”, o valor entra como aporte real do mês e passa a abater da meta mínima.
+          Lançando em “Investimento”, o valor entra como aporte real do mês e ajuda a bater a meta mínima de investimento.
+        </Hint>
+      )}
+
+      {isGoalPayment && (
+        <Hint>
+          Lançando em “Meta”, o sistema entende que esse dinheiro saiu da conta e foi destinado a um objetivo específico.
         </Hint>
       )}
 
       <Input
         placeholder="Observação"
         value={note}
-        onChange={e => setNote(e.target.value)}
+        onChange={event => setNote(event.target.value)}
       />
 
-      <Button type="submit">Salvar lançamento</Button>
+      <Button type="submit" disabled={loading}>
+        {loading ? 'Salvando...' : 'Salvar lançamento'}
+      </Button>
     </Form>
   )
 }

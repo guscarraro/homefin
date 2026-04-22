@@ -14,18 +14,29 @@ const SwipeWrapper = styled.div`
 const DeleteBackground = styled.div`
   position: absolute;
   inset: 0;
-  background: #dc2626;
+  background: linear-gradient(90deg, rgba(220, 38, 38, 0.10) 0%, rgba(220, 38, 38, 0.82) 100%);
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding-right: 22px;
+  padding-right: 20px;
   color: #fff;
+  border-radius: 30px;
 `
 
 const Foreground = styled.div`
   position: relative;
   transform: translateX(${({ offset }) => `${offset}px`});
-  transition: ${({ dragging }) => (dragging ? 'none' : 'transform 0.18s ease')};
+  transition: ${({ dragging }) => (dragging ? 'none' : 'transform 0.22s ease-out')};
+  will-change: transform;
+`
+
+const StyledEntryCard = styled(Card)`
+  border: 1px solid ${({ tone, theme }) => {
+    if (tone === 'salary') return 'rgba(34, 197, 94, 0.35)'
+    if (tone === 'investment') return 'rgba(124, 58, 237, 0.30)'
+    if (tone === 'fixed') return 'rgba(37, 99, 235, 0.28)'
+    return theme.colors.border
+  }};
 `
 
 const Top = styled.div`
@@ -38,6 +49,7 @@ const Left = styled.div`
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 `
 
 const TitleRow = styled.div`
@@ -49,6 +61,7 @@ const TitleRow = styled.div`
 
 const Title = styled.strong`
   font-size: 16px;
+  color: ${({ theme }) => theme.colors.text};
 `
 
 const Badge = styled.span`
@@ -60,15 +73,17 @@ const Badge = styled.span`
   font-size: 12px;
   font-weight: 700;
   background: ${({ tone, theme }) => {
+    if (tone === 'salary') return 'rgba(34, 197, 94, 0.12)'
     if (tone === 'fixed') return 'rgba(37, 99, 235, 0.12)'
     if (tone === 'installment') return 'rgba(124, 58, 237, 0.12)'
-    if (tone === 'investment') return 'rgba(34, 197, 94, 0.12)'
+    if (tone === 'investment') return 'rgba(124, 58, 237, 0.12)'
     return theme.colors.primarySoft
   }};
   color: ${({ tone, theme }) => {
+    if (tone === 'salary') return '#16a34a'
     if (tone === 'fixed') return '#2563eb'
     if (tone === 'installment') return '#7c3aed'
-    if (tone === 'investment') return '#16a34a'
+    if (tone === 'investment') return '#7c3aed'
     return theme.colors.text
   }};
 `
@@ -76,11 +91,17 @@ const Badge = styled.span`
 const Note = styled.div`
   color: ${({ theme }) => theme.colors.textSoft};
   line-height: 1.4;
+  word-break: break-word;
 `
 
 const Amount = styled.strong`
   white-space: nowrap;
   font-size: 18px;
+  color: ${({ tone }) => {
+    if (tone === 'salary') return '#16a34a'
+    if (tone === 'investment') return '#7c3aed'
+    return '#dc2626'
+  }};
 `
 
 const Meta = styled.div`
@@ -179,7 +200,27 @@ function formatDate(value) {
   return date.toLocaleDateString('pt-BR')
 }
 
+function getItemTone(item) {
+  if (item.sourceType === 'salary') {
+    return 'salary'
+  }
+
+  if (item.sourceType === 'fixed_cost') {
+    return 'fixed'
+  }
+
+  if (item.type === 'investment') {
+    return 'investment'
+  }
+
+  return 'expense'
+}
+
 function getBadgeTone(item) {
+  if (item.sourceType === 'salary') {
+    return 'salary'
+  }
+
   if (item.sourceType === 'fixed_cost') {
     return 'fixed'
   }
@@ -195,6 +236,16 @@ function getBadgeTone(item) {
   return 'default'
 }
 
+function getAmountLabel(item) {
+  const tone = getItemTone(item)
+
+  if (tone === 'salary') {
+    return `+ ${formatCurrency(item.displayAmount)}`
+  }
+
+  return `- ${formatCurrency(item.displayAmount)}`
+}
+
 function EntryItem({ item }) {
   const {
     selectedMonth,
@@ -208,6 +259,9 @@ function EntryItem({ item }) {
   const [dragging, setDragging] = useState(false)
   const [startX, setStartX] = useState(0)
   const [showModal, setShowModal] = useState(false)
+
+  const isSalary = item.sourceType === 'salary'
+  const itemTone = getItemTone(item)
 
   const deleteMode = useMemo(() => {
     if (item.sourceType === 'fixed_cost') {
@@ -232,6 +286,10 @@ function EntryItem({ item }) {
   }
 
   function openDeleteModal() {
+    if (isSalary) {
+      return
+    }
+
     setShowModal(true)
     resetSwipe()
   }
@@ -242,12 +300,16 @@ function EntryItem({ item }) {
   }
 
   function handleTouchStart(event) {
+    if (isSalary) {
+      return
+    }
+
     setDragging(true)
     setStartX(event.touches[0].clientX)
   }
 
   function handleTouchMove(event) {
-    if (!dragging) {
+    if (!dragging || isSalary) {
       return
     }
 
@@ -259,8 +321,8 @@ function EntryItem({ item }) {
       return
     }
 
-    if (delta < -120) {
-      setOffset(-120)
+    if (delta < -96) {
+      setOffset(-96)
       return
     }
 
@@ -268,9 +330,13 @@ function EntryItem({ item }) {
   }
 
   function handleTouchEnd() {
+    if (isSalary) {
+      return
+    }
+
     setDragging(false)
 
-    if (offset <= -88) {
+    if (offset <= -72) {
       openDeleteModal()
       return
     }
@@ -327,9 +393,11 @@ function EntryItem({ item }) {
   return (
     <>
       <SwipeWrapper>
-        <DeleteBackground>
-          <FiTrash2 size={22} />
-        </DeleteBackground>
+        {!isSalary && (
+          <DeleteBackground>
+            <FiTrash2 size={20} />
+          </DeleteBackground>
+        )}
 
         <Foreground
           offset={offset}
@@ -338,38 +406,35 @@ function EntryItem({ item }) {
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         >
-          <Card>
+          <StyledEntryCard tone={itemTone}>
             <Top>
               <Left>
                 <TitleRow>
                   <Title>{item.title}</Title>
 
                   <Badge tone={getBadgeTone(item)}>
-                    {item.sourceType === 'fixed_cost'
-                      ? 'Fixo'
-                      : item.type === 'investment'
-                        ? 'Investimento'
-                        : item.isInstallment
-                          ? item.installmentLabel
-                          : 'Normal'}
+                    {item.sourceType === 'salary'
+                      ? 'Salário'
+                      : item.sourceType === 'fixed_cost'
+                        ? 'Fixo'
+                        : item.type === 'investment'
+                          ? 'Investimento'
+                          : item.isInstallment
+                            ? item.installmentLabel
+                            : 'Normal'}
                   </Badge>
                 </TitleRow>
 
                 <Note>{item.displayNote || 'Sem observação'}</Note>
               </Left>
 
-              <Amount>{formatCurrency(item.displayAmount)}</Amount>
+              <Amount tone={itemTone}>{getAmountLabel(item)}</Amount>
             </Top>
 
             <Meta>{renderMeta()}</Meta>
 
-            <Actions>
-              <DangerButton type="button" onClick={openDeleteModal}>
-                <FiTrash2 size={16} />
-                Remover
-              </DangerButton>
-            </Actions>
-          </Card>
+            
+          </StyledEntryCard>
         </Foreground>
       </SwipeWrapper>
 
@@ -407,7 +472,7 @@ function EntryItem({ item }) {
             {deleteMode === 'recurring' && (
               <>
                 <ModalText>
-                  Esse lançamento é recorrente. Você quer remover apenas a ocorrência deste mês ou apagar a recorrência inteira?
+                  Esse lançamento é recorrente. Remover só este mês ainda é temporário no front. Remover a recorrência inteira já apaga de verdade no backend.
                 </ModalText>
 
                 <ModalActions>
@@ -429,7 +494,7 @@ function EntryItem({ item }) {
             {deleteMode === 'installment' && (
               <>
                 <ModalText>
-                  Esse lançamento faz parte de um parcelamento. Você quer remover apenas a parcela deste mês ou o parcelamento inteiro?
+                  Esse lançamento faz parte de um parcelamento. Remover só esta parcela ainda é temporário no front. Remover o parcelamento inteiro já apaga de verdade no backend.
                 </ModalText>
 
                 <ModalActions>
@@ -451,7 +516,7 @@ function EntryItem({ item }) {
             {deleteMode === 'fixed' && (
               <>
                 <ModalText>
-                  Esse item é um custo fixo. Você quer remover apenas a cobrança deste mês ou apagar o custo fixo recorrente?
+                  Esse item é um custo fixo. Remover só este mês ainda é temporário no front. Remover o custo fixo inteiro já apaga de verdade no backend.
                 </ModalText>
 
                 <ModalActions>

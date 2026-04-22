@@ -26,8 +26,9 @@ function FixedCostForm() {
   const [amount, setAmount] = useState('')
   const [dueDay, setDueDay] = useState('')
   const [category, setCategory] = useState('Casa')
+  const [loading, setLoading] = useState(false)
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
 
     const parsedAmount = Number(String(amount).replace(',', '.'))
@@ -48,17 +49,23 @@ function FixedCostForm() {
       return
     }
 
-    addFixedCost({
-      title: title.trim(),
-      amount: parsedAmount,
-      dueDay: parsedDueDay,
-      category
-    })
+    try {
+      setLoading(true)
 
-    setTitle('')
-    setAmount('')
-    setDueDay('')
-    setCategory('Casa')
+      await addFixedCost({
+        title: title.trim(),
+        amount: parsedAmount,
+        dueDay: parsedDueDay,
+        category
+      })
+
+      setTitle('')
+      setAmount('')
+      setDueDay('')
+      setCategory('Casa')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -93,7 +100,9 @@ function FixedCostForm() {
           placeholder="Categoria"
         />
 
-        <Button type="submit">Salvar custo fixo</Button>
+        <Button type="submit" disabled={loading}>
+          {loading ? 'Salvando...' : 'Salvar custo fixo'}
+        </Button>
       </Form>
     </Card>
   )

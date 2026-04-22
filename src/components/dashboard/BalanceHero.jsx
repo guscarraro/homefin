@@ -55,7 +55,7 @@ function BalanceHero({ projection }) {
         <Header>
           <h2>Sem projeção do mês</h2>
           <Description>
-            Cadastrem os salários para liberar o painel inteligente com saldo, metas, investimento e comparação entre planejado e real.
+            Cadastrem os salários para liberar o painel com saldo, metas, investimento e leitura real do mês.
           </Description>
         </Header>
       </Card>
@@ -65,11 +65,11 @@ function BalanceHero({ projection }) {
   return (
     <Card>
       <Header>
-        <Eyebrow>Indicador principal do mês</Eyebrow>
-        <h2>Saldo estratégico</h2>
+        <Eyebrow>Visão principal do mês</Eyebrow>
+        <h2>Disponível até o fim do mês</h2>
         <MainValue>{formatCurrency(projection.availableAfterGoals)}</MainValue>
         <Description>
-          Esse valor mostra o que realmente sobra depois de custos fixos, variáveis, investimentos já feitos e metas mensais.
+          Esse é o valor que realmente sobra depois de custos fixos, despesas variáveis, investimentos e reserva mensal das metas.
         </Description>
       </Header>
 
@@ -85,12 +85,22 @@ function BalanceHero({ projection }) {
         </Block>
 
         <Block>
-          <Label>Meta mensal para objetivos</Label>
+          <Label>Teto da semana</Label>
+          <Value>{formatCurrency(projection.weeklyBudget)}</Value>
+        </Block>
+
+        <Block>
+          <Label>Teto por dia</Label>
+          <Value>{formatCurrency(projection.dailyLimit)}</Value>
+        </Block>
+
+        <Block>
+          <Label>Reserva mensal das metas</Label>
           <Value>{formatCurrency(projection.monthlyGoalsNeed)}</Value>
         </Block>
 
         <Block>
-          <Label>Próximo mês já comprometido</Label>
+          <Label>Próximo mês comprometido</Label>
           <Value>{formatCurrency(projection.nextMonthCommitted)}</Value>
         </Block>
       </Grid>

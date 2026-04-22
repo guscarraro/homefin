@@ -13,15 +13,15 @@ const Grid = styled.div`
 `
 
 function DashboardPage() {
-  const { projection, categoryTotals, suggestions } = useFinance()
+  const { projection } = useFinance()
 
   return (
     <AppShell title="Resumo do mês">
       <Grid>
+        <QuickLaunch />
         <BalanceHero projection={projection} />
         <SpendingDonut projection={projection} />
-        <QuickLaunch />
-        <SuggestionsCard suggestions={suggestions} />
+        <SuggestionsCard projection={projection} />
       </Grid>
     </AppShell>
   )

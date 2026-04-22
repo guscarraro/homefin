@@ -12,43 +12,96 @@ const Form = styled.form`
   gap: 12px;
 `
 
+function getSelectValue(value) {
+  if (value?.target) return value.target.value
+  if (value?.value) return value.value
+  return value || ''
+}
+
 function GoalSimulationForm() {
   const { addGoal } = useFinance()
+
   const [title, setTitle] = useState('')
   const [targetAmount, setTargetAmount] = useState('')
   const [targetMonths, setTargetMonths] = useState('')
   const [priority, setPriority] = useState('media')
+  const [loading, setLoading] = useState(false)
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
 
-    addGoal({
-      title,
-      targetAmount: Number(targetAmount),
-      targetMonths: Number(targetMonths),
-      priority
-    })
+    const parsedTargetAmount = Number(String(targetAmount || 0).replace(',', '.'))
+    const parsedTargetMonths = Number(targetMonths || 0)
 
-    setTitle('')
-    setTargetAmount('')
-    setTargetMonths('')
-    setPriority('media')
+    if (!title.trim()) {
+      alert('Informe o nome da meta')
+      return
+    }
+
+    if (!parsedTargetAmount || parsedTargetAmount <= 0) {
+      alert('Informe um valor alvo válido')
+      return
+    }
+
+    if (!parsedTargetMonths || parsedTargetMonths <= 0) {
+      alert('Informe um prazo válido em meses')
+      return
+    }
+
+    try {
+      setLoading(true)
+
+      await addGoal({
+        title: title.trim(),
+        targetAmount: parsedTargetAmount,
+        targetMonths: parsedTargetMonths,
+        priority
+      })
+
+      setTitle('')
+      setTargetAmount('')
+      setTargetMonths('')
+      setPriority('media')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
     <Card>
       <h3>Nova meta</h3>
+
       <Form onSubmit={handleSubmit}>
-        <Input placeholder="Ex: Viagem, carro, apartamento" value={title} onChange={event => setTitle(event.target.value)} />
-        <Input placeholder="Valor alvo" value={targetAmount} onChange={event => setTargetAmount(event.target.value)} />
-        <Input placeholder="Prazo em meses" value={targetMonths} onChange={event => setTargetMonths(event.target.value)} />
+        <Input
+          placeholder="Ex: Viagem, carro, apartamento"
+          value={title}
+          onChange={event => setTitle(event.target.value)}
+        />
+
+        <Input
+          placeholder="Valor alvo"
+          inputMode="decimal"
+          value={targetAmount}
+          onChange={event => setTargetAmount(event.target.value)}
+        />
+
+        <Input
+          placeholder="Prazo em meses"
+          inputMode="numeric"
+          value={targetMonths}
+          onChange={event => setTargetMonths(event.target.value)}
+        />
+
         <StyledSelect
           options={['alta', 'media', 'baixa']}
           value={priority}
-          onChange={event => setPriority(event.target.value)}
+          onChange={value => setPriority(getSelectValue(value))}
           placeholder="Prioridade"
         />
-        <Button type="submit">Adicionar meta</Button>
+
+        <Button type="submit" disabled={loading}>
+          {loading ? 'Salvando...' : 'Adicionar meta'}
+        </Button>
       </Form>
     </Card>
   )

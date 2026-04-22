@@ -3,6 +3,7 @@ import AppShell from '../components/layout/AppShell'
 import SalaryMonthForm from '../components/salary/SalaryMonthForm'
 import Card from '../components/common/Card'
 import { useFinance } from '../context/FinanceContext'
+import { formatCurrency } from '../utils/currency'
 
 const List = styled.div`
   display: flex;
@@ -20,10 +21,11 @@ function SalariesPage() {
 
       <List>
         {financeData.salaries.map(item => (
-          <Card key={item.month}>
+          <Card key={item.id || item.month}>
             <strong>{item.month}</strong>
-            <p>Gustavo: {item.gustavo}</p>
-            <p>Marccella: {item.marccella}</p>
+            <p>Gustavo: {formatCurrency(item.gustavo)}</p>
+            <p>Marccella: {formatCurrency(item.marccella)}</p>
+            <p>Total: {formatCurrency(item.amount)}</p>
           </Card>
         ))}
       </List>

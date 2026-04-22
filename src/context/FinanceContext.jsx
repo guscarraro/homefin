@@ -1,6 +1,5 @@
-import { createContext, useContext, useMemo } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { useLocalStorage } from '../hooks/useLocalStorage'
-import { DEFAULT_DATA } from '../services/mockData'
 import {
   buildMonthlyProjection,
   buildSuggestions,
@@ -9,6 +8,19 @@ import {
   getMonthlyEntriesList
 } from '../utils/finance'
 import { addMonthsToMonthKey, getMonthKeyFromDate } from '../utils/date'
+import {
+  getEntries,
+  createEntry,
+  deleteEntry,
+  getFixedCosts,
+  createFixedCost,
+  deleteFixedCost,
+  getGoals,
+  createGoal,
+  deleteGoal,
+  getSalaries,
+  saveSalary
+} from '../services/api'
 
 const FinanceContext = createContext(null)
 
@@ -24,46 +36,110 @@ function normalizeEntry(entry) {
   }
 }
 
+function normalizeFixedCost(item) {
+  return {
+    ...item,
+    skippedMonths: item.skippedMonths || []
+  }
+}
+
 export function FinanceProvider({ children }) {
-  const [financeData, setFinanceData] = useLocalStorage('homefin:data', DEFAULT_DATA)
+  const [financeData, setFinanceData] = useState({
+    salaries: [],
+    fixedCosts: [],
+    entries: [],
+    goals: []
+  })
   const [selectedMonth, setSelectedMonth] = useLocalStorage(
     'homefin:selected-month',
     getMonthKeyFromDate(new Date())
   )
+  const [loading, setLoading] = useState(true)
 
-  const normalizedEntries = useMemo(() => {
-    const result = []
+  useEffect(() => {
+    async function loadFinanceData() {
+      const token = localStorage.getItem('token')
 
-    for (const entry of financeData.entries || []) {
-      result.push(normalizeEntry(entry))
+      if (!token) {
+        setFinanceData({
+          salaries: [],
+          fixedCosts: [],
+          entries: [],
+          goals: []
+        })
+        setLoading(false)
+        return
+      }
+
+      try {
+        setLoading(true)
+
+        const [entriesData, fixedCostsData, goalsData, salariesData] = await Promise.all([
+          getEntries(),
+          getFixedCosts(),
+          getGoals(),
+          getSalaries()
+        ])
+
+        const normalizedEntries = []
+        for (const entry of entriesData || []) {
+          normalizedEntries.push(normalizeEntry(entry))
+        }
+
+        const normalizedFixedCosts = []
+        for (const item of fixedCostsData || []) {
+          normalizedFixedCosts.push(normalizeFixedCost(item))
+        }
+
+        setFinanceData({
+          salaries: salariesData || [],
+          fixedCosts: normalizedFixedCosts,
+          entries: normalizedEntries,
+          goals: goalsData || []
+        })
+      } catch (error) {
+        console.error('Erro ao carregar dados financeiros:', error)
+        setFinanceData({
+          salaries: [],
+          fixedCosts: [],
+          entries: [],
+          goals: []
+        })
+      } finally {
+        setLoading(false)
+      }
     }
 
-    return result
-  }, [financeData.entries])
+    loadFinanceData()
+  }, [])
 
-  const normalizedFixedCosts = useMemo(() => {
-    const result = []
+  async function reloadFinanceData() {
+    const [entriesData, fixedCostsData, goalsData, salariesData] = await Promise.all([
+      getEntries(),
+      getFixedCosts(),
+      getGoals(),
+      getSalaries()
+    ])
 
-    for (const item of financeData.fixedCosts || []) {
-      result.push({
-        ...item,
-        skippedMonths: item.skippedMonths || []
-      })
+    const normalizedEntries = []
+    for (const entry of entriesData || []) {
+      normalizedEntries.push(normalizeEntry(entry))
     }
 
-    return result
-  }, [financeData.fixedCosts])
+    const normalizedFixedCosts = []
+    for (const item of fixedCostsData || []) {
+      normalizedFixedCosts.push(normalizeFixedCost(item))
+    }
 
-  const normalizedFinanceData = useMemo(
-    () => ({
-      ...financeData,
+    setFinanceData({
+      salaries: salariesData || [],
+      fixedCosts: normalizedFixedCosts,
       entries: normalizedEntries,
-      fixedCosts: normalizedFixedCosts
-    }),
-    [financeData, normalizedEntries, normalizedFixedCosts]
-  )
+      goals: goalsData || []
+    })
+  }
 
-  function addEntry(entry) {
+  async function addEntry(entry) {
     const totalAmount = Number(entry.amount || 0)
     const category = String(entry.category || 'Geral').trim()
     const isInvestmentCategory = category.toLowerCase() === 'investimento'
@@ -83,9 +159,8 @@ export function FinanceProvider({ children }) {
           : originMonth
     }
 
-    const nextEntry = {
+    const payload = {
       ...entry,
-      id: `entry-${Date.now()}`,
       type: entryType,
       category,
       amount: totalAmount,
@@ -95,17 +170,20 @@ export function FinanceProvider({ children }) {
         ? Number((totalAmount / installmentCount).toFixed(2))
         : totalAmount,
       installmentStartMonth,
-      isRecurring,
-      skippedMonths: []
+      isRecurring
     }
 
-    setFinanceData({
-      ...financeData,
-      entries: [nextEntry, ...financeData.entries]
-    })
+    const createdEntry = await createEntry(payload)
+
+    const normalizedCreatedEntry = normalizeEntry(createdEntry)
+
+    setFinanceData(previous => ({
+      ...previous,
+      entries: [normalizedCreatedEntry, ...previous.entries]
+    }))
   }
 
-  function saveMonthSalary(payload) {
+  async function saveMonthSalary(payload) {
     const normalizedMonth =
       payload.month?.length === 7
         ? payload.month
@@ -114,182 +192,212 @@ export function FinanceProvider({ children }) {
     const gustavo = Number(payload.gustavo || 0)
     const marccella = Number(payload.marccella || 0)
 
-    const nextSalary = {
+    const nextSalary = await saveSalary({
       month: normalizedMonth,
       gustavo,
       marccella,
       amount: gustavo + marccella
-    }
+    })
 
-    const remaining = []
+    setFinanceData(previous => {
+      const remaining = []
 
-    for (const item of financeData.salaries) {
-      if (item.month !== normalizedMonth) {
-        remaining.push(item)
+      for (const item of previous.salaries || []) {
+        if (item.month !== normalizedMonth) {
+          remaining.push(item)
+        }
       }
-    }
 
-    setFinanceData({
-      ...financeData,
-      salaries: [...remaining, nextSalary]
+      return {
+        ...previous,
+        salaries: [...remaining, nextSalary]
+      }
     })
   }
 
-  function addGoal(goal) {
-    const nextGoal = {
-      ...goal,
-      id: `goal-${Date.now()}`
-    }
+  async function addGoal(goal) {
+    const createdGoal = await createGoal(goal)
 
-    setFinanceData({
-      ...financeData,
-      goals: [nextGoal, ...financeData.goals]
-    })
+    setFinanceData(previous => ({
+      ...previous,
+      goals: [createdGoal, ...previous.goals]
+    }))
   }
 
-  function addFixedCost(payload) {
-    const nextFixedCost = {
-      id: `fixed-${Date.now()}`,
+  async function addFixedCost(payload) {
+    const createdFixedCost = await createFixedCost({
       title: payload.title,
       amount: Number(payload.amount || 0),
       dueDay: Number(payload.dueDay || 1),
       active: true,
-      category: payload.category || 'Casa',
-      skippedMonths: []
-    }
-
-    setFinanceData({
-      ...financeData,
-      fixedCosts: [nextFixedCost, ...(financeData.fixedCosts || [])]
+      category: payload.category || 'Casa'
     })
+
+    const normalizedCreatedFixedCost = normalizeFixedCost(createdFixedCost)
+
+    setFinanceData(previous => ({
+      ...previous,
+      fixedCosts: [normalizedCreatedFixedCost, ...previous.fixedCosts]
+    }))
   }
 
-  function removeEntry(entryId) {
-    const nextEntries = []
+  async function removeEntry(entryId) {
+    await deleteEntry(entryId)
 
-    for (const entry of financeData.entries || []) {
-      if (entry.id !== entryId) {
-        nextEntries.push(entry)
+    setFinanceData(previous => {
+      const nextEntries = []
+
+      for (const entry of previous.entries || []) {
+        if (entry.id !== entryId) {
+          nextEntries.push(entry)
+        }
       }
-    }
 
-    setFinanceData({
-      ...financeData,
-      entries: nextEntries
+      return {
+        ...previous,
+        entries: nextEntries
+      }
     })
   }
 
   function skipRecurringEntryMonth(entryId, monthKey) {
-    const nextEntries = []
+    setFinanceData(previous => {
+      const nextEntries = []
 
-    for (const entry of financeData.entries || []) {
-      if (entry.id !== entryId) {
-        nextEntries.push(entry)
-        continue
-      }
-
-      const skippedMonths = entry.skippedMonths ? [...entry.skippedMonths] : []
-      let alreadyExists = false
-
-      for (const skippedMonth of skippedMonths) {
-        if (skippedMonth === monthKey) {
-          alreadyExists = true
+      for (const entry of previous.entries || []) {
+        if (entry.id !== entryId) {
+          nextEntries.push(entry)
+          continue
         }
+
+        const skippedMonths = entry.skippedMonths ? [...entry.skippedMonths] : []
+        let alreadyExists = false
+
+        for (const skippedMonth of skippedMonths) {
+          if (skippedMonth === monthKey) {
+            alreadyExists = true
+          }
+        }
+
+        if (!alreadyExists) {
+          skippedMonths.push(monthKey)
+        }
+
+        nextEntries.push({
+          ...entry,
+          skippedMonths
+        })
       }
 
-      if (!alreadyExists) {
-        skippedMonths.push(monthKey)
+      return {
+        ...previous,
+        entries: nextEntries
       }
-
-      nextEntries.push({
-        ...entry,
-        skippedMonths
-      })
-    }
-
-    setFinanceData({
-      ...financeData,
-      entries: nextEntries
     })
   }
 
-  function removeFixedCost(fixedCostId) {
-    const nextFixedCosts = []
+  async function removeFixedCost(fixedCostId) {
+    await deleteFixedCost(fixedCostId)
 
-    for (const item of financeData.fixedCosts || []) {
-      if (item.id !== fixedCostId) {
-        nextFixedCosts.push(item)
+    setFinanceData(previous => {
+      const nextFixedCosts = []
+
+      for (const item of previous.fixedCosts || []) {
+        if (item.id !== fixedCostId) {
+          nextFixedCosts.push(item)
+        }
       }
-    }
 
-    setFinanceData({
-      ...financeData,
-      fixedCosts: nextFixedCosts
+      return {
+        ...previous,
+        fixedCosts: nextFixedCosts
+      }
     })
   }
 
   function skipFixedCostMonth(fixedCostId, monthKey) {
-    const nextFixedCosts = []
+    setFinanceData(previous => {
+      const nextFixedCosts = []
 
-    for (const item of financeData.fixedCosts || []) {
-      if (item.id !== fixedCostId) {
-        nextFixedCosts.push(item)
-        continue
+      for (const item of previous.fixedCosts || []) {
+        if (item.id !== fixedCostId) {
+          nextFixedCosts.push(item)
+          continue
+        }
+
+        const skippedMonths = item.skippedMonths ? [...item.skippedMonths] : []
+        let alreadyExists = false
+
+        for (const skippedMonth of skippedMonths) {
+          if (skippedMonth === monthKey) {
+            alreadyExists = true
+          }
+        }
+
+        if (!alreadyExists) {
+          skippedMonths.push(monthKey)
+        }
+
+        nextFixedCosts.push({
+          ...item,
+          skippedMonths
+        })
       }
 
-      const skippedMonths = item.skippedMonths ? [...item.skippedMonths] : []
-      let alreadyExists = false
+      return {
+        ...previous,
+        fixedCosts: nextFixedCosts
+      }
+    })
+  }
 
-      for (const skippedMonth of skippedMonths) {
-        if (skippedMonth === monthKey) {
-          alreadyExists = true
+  async function removeGoal(goalId) {
+    await deleteGoal(goalId)
+
+    setFinanceData(previous => {
+      const nextGoals = []
+
+      for (const goal of previous.goals || []) {
+        if (goal.id !== goalId) {
+          nextGoals.push(goal)
         }
       }
 
-      if (!alreadyExists) {
-        skippedMonths.push(monthKey)
+      return {
+        ...previous,
+        goals: nextGoals
       }
-
-      nextFixedCosts.push({
-        ...item,
-        skippedMonths
-      })
-    }
-
-    setFinanceData({
-      ...financeData,
-      fixedCosts: nextFixedCosts
     })
   }
 
   const projection = useMemo(
-    () => buildMonthlyProjection(normalizedFinanceData, selectedMonth),
-    [normalizedFinanceData, selectedMonth]
+    () => buildMonthlyProjection(financeData, selectedMonth),
+    [financeData, selectedMonth]
   )
 
   const suggestions = useMemo(
-    () => buildSuggestions(projection, normalizedFinanceData.goals),
-    [projection, normalizedFinanceData.goals]
+    () => buildSuggestions(projection, financeData.goals),
+    [projection, financeData.goals]
   )
 
   const categoryTotals = useMemo(
-    () => getCategoryTotalsForMonth(normalizedFinanceData.entries, selectedMonth),
-    [normalizedFinanceData.entries, selectedMonth]
+    () => getCategoryTotalsForMonth(financeData.entries, selectedMonth),
+    [financeData.entries, selectedMonth]
   )
 
   const currentMonthInstallments = useMemo(
-    () => getInstallmentsForMonth(normalizedFinanceData.entries, selectedMonth),
-    [normalizedFinanceData.entries, selectedMonth]
+    () => getInstallmentsForMonth(financeData.entries, selectedMonth),
+    [financeData.entries, selectedMonth]
   )
 
   const visibleEntries = useMemo(
-    () => getMonthlyEntriesList(normalizedFinanceData, selectedMonth),
-    [normalizedFinanceData, selectedMonth]
+    () => getMonthlyEntriesList(financeData, selectedMonth),
+    [financeData, selectedMonth]
   )
 
   const value = useMemo(
     () => ({
-      financeData: normalizedFinanceData,
+      financeData,
       selectedMonth,
       setSelectedMonth,
       visibleEntries,
@@ -301,19 +409,23 @@ export function FinanceProvider({ children }) {
       skipRecurringEntryMonth,
       removeFixedCost,
       skipFixedCostMonth,
+      removeGoal,
       projection,
       suggestions,
       categoryTotals,
-      currentMonthInstallments
+      currentMonthInstallments,
+      loading,
+      reloadFinanceData
     }),
     [
-      normalizedFinanceData,
+      financeData,
       selectedMonth,
       visibleEntries,
       projection,
       suggestions,
       categoryTotals,
-      currentMonthInstallments
+      currentMonthInstallments,
+      loading
     ]
   )
 

@@ -37,9 +37,9 @@ function GoalCard({ goal }) {
 
   return (
     <Card>
-      <h3>{goal.title}</h3>
+      <h3>{goal.title || 'Meta sem nome'}</h3>
       <p>Meta: {formatCurrency(goal.targetAmount)}</p>
-      <p>Prazo desejado: {goal.targetMonths} meses</p>
+      <p>Prazo desejado: {goal.targetMonths || 0} meses</p>
 
       <Grid>
         <Block>
@@ -73,10 +73,10 @@ function GoalCard({ goal }) {
           <p style={{ marginTop: 6 }}>
             Caminho honesto: reduzir gasto variável, alongar o prazo ou baixar o valor da meta.
           </p>
+
           {simulation.estimatedMonths > 0 && (
             <p style={{ marginTop: 6 }}>
-              No ritmo atual, essa meta ficaria mais realista em cerca de {simulation.estimatedMonths}{' '}
-              meses.
+              No ritmo atual, essa meta ficaria mais realista em cerca de {simulation.estimatedMonths} meses.
             </p>
           )}
         </PlanBox>

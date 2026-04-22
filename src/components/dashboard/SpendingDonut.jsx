@@ -19,14 +19,15 @@ const Header = styled.div`
 `
 
 const Subtitle = styled.p`
-  color: ${({ theme }) => theme.colors.textSoft};
+  color: ${({ theme }) => theme.colors.text};
+  opacity: 0.86;
   line-height: 1.45;
 `
 
 const ChartArea = styled.div`
   position: relative;
   width: 100%;
-  height: 340px;
+  height: 380px;
 `
 
 const ChartWrap = styled.div`
@@ -47,8 +48,8 @@ const CenterInfo = styled.div`
 `
 
 const CenterInner = styled.div`
-  width: 124px;
-  height: 124px;
+  width: 132px;
+  height: 132px;
   border-radius: 999px;
   background: ${({ theme }) => theme.colors.surface};
   display: flex;
@@ -58,26 +59,29 @@ const CenterInner = styled.div`
   gap: 4px;
   text-align: center;
   box-shadow: inset 0 0 0 1px ${({ theme }) => theme.colors.border};
+  padding: 10px;
 `
 
 const CenterLabel = styled.div`
-  font-size: 12px;
-  color: ${({ theme }) => theme.colors.textSoft};
-  max-width: 90px;
-  line-height: 1.2;
+  font-size: 11px;
+  color: ${({ theme }) => theme.colors.text};
+  opacity: 0.72;
+  max-width: 88px;
+  line-height: 1.15;
 `
 
 const CenterValue = styled.div`
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 800;
   line-height: 1;
 `
 
 const CenterSubValue = styled.div`
-  font-size: 12px;
-  color: ${({ theme }) => theme.colors.textSoft};
-  max-width: 96px;
-  line-height: 1.25;
+  font-size: 11px;
+  color: ${({ theme }) => theme.colors.text};
+  opacity: 0.72;
+  max-width: 90px;
+  line-height: 1.2;
 `
 
 const LegendsGrid = styled.div`
@@ -92,12 +96,14 @@ const LegendCard = styled.div`
   border-radius: 18px;
   padding: 12px;
   background: ${({ theme }) => theme.colors.surfaceAlt};
+  color: ${({ theme }) => theme.colors.text};
 `
 
 const LegendTitle = styled.div`
   font-size: 14px;
   font-weight: 800;
   margin-bottom: 10px;
+  color: ${({ theme }) => theme.colors.text};
 `
 
 const LegendList = styled.div`
@@ -116,8 +122,9 @@ const LegendItem = styled.button`
   background: ${({ active, theme }) =>
     active ? theme.colors.primarySoft : 'rgba(255,255,255,0.02)'};
   box-shadow: ${({ active }) =>
-    active ? 'inset 0 0 0 1px rgba(255,255,255,0.85)' : 'none'};
+    active ? 'inset 0 0 0 1px rgba(255,255,255,0.18)' : 'none'};
   transition: 0.2s ease;
+  color: ${({ theme }) => theme.colors.text};
 `
 
 const LegendTop = styled.div`
@@ -147,6 +154,7 @@ const LegendName = styled.span`
   font-weight: 700;
   line-height: 1.2;
   word-break: break-word;
+  color: ${({ theme }) => theme.colors.text};
 `
 
 const LegendValueRow = styled.div`
@@ -159,13 +167,15 @@ const LegendValue = styled.div`
   font-weight: 800;
   line-height: 1.2;
   word-break: break-word;
+  color: ${({ theme }) => theme.colors.text};
 `
 
 const LegendMeta = styled.div`
   margin-top: 4px;
   padding-left: 20px;
   font-size: 11px;
-  color: ${({ theme }) => theme.colors.textSoft};
+  color: ${({ theme }) => theme.colors.text};
+  opacity: 0.72;
   line-height: 1.35;
 `
 
@@ -184,7 +194,8 @@ const Stat = styled.div`
 
 const StatLabel = styled.div`
   font-size: 13px;
-  color: ${({ theme }) => theme.colors.textSoft};
+  color: ${({ theme }) => theme.colors.text};
+  opacity: 0.72;
   margin-bottom: 4px;
 `
 
@@ -194,104 +205,28 @@ const StatValue = styled.div`
 `
 
 const COLORS = {
-  investment: {
-    planned: '#6d28d9',
-    actual: '#a78bfa'
-  },
-  goals: {
-    planned: '#0f766e',
-    actual: '#5eead4'
-  },
-  fixed: {
-    planned: '#1d4ed8',
-    actual: '#60a5fa'
-  },
-  market: {
-    planned: '#15803d',
-    actual: '#4ade80'
-  },
-  food: {
-    planned: '#c2410c',
-    actual: '#fb923c'
-  },
-  leisure: {
-    planned: '#be123c',
-    actual: '#fb7185'
-  },
-  transport: {
-    planned: '#a16207',
-    actual: '#facc15'
-  },
-  other: {
-    planned: '#374151',
-    actual: '#9ca3af'
-  }
+  investment: { planned: '#6d28d9', actual: '#a78bfa' },
+  goals: { planned: '#0f766e', actual: '#5eead4' },
+  fixed: { planned: '#1d4ed8', actual: '#60a5fa' },
+  market: { planned: '#15803d', actual: '#4ade80' },
+  food: { planned: '#c2410c', actual: '#fb923c' },
+  leisure: { planned: '#be123c', actual: '#fb7185' },
+  transport: { planned: '#a16207', actual: '#facc15' },
+  other: { planned: '#374151', actual: '#9ca3af' }
 }
 
 function getCategoryVisual(name) {
   const normalized = String(name || '').toLowerCase()
 
-  if (normalized.includes('invest')) {
-    return {
-      key: 'investment',
-      planned: COLORS.investment.planned,
-      actual: COLORS.investment.actual
-    }
-  }
+  if (normalized.includes('invest')) return { key: 'investment', ...COLORS.investment }
+  if (normalized.includes('meta')) return { key: 'goals', ...COLORS.goals }
+  if (normalized.includes('fix')) return { key: 'fixed', ...COLORS.fixed }
+  if (normalized.includes('mercado')) return { key: 'market', ...COLORS.market }
+  if (normalized.includes('alimenta')) return { key: 'food', ...COLORS.food }
+  if (normalized.includes('lazer')) return { key: 'leisure', ...COLORS.leisure }
+  if (normalized.includes('transporte')) return { key: 'transport', ...COLORS.transport }
 
-  if (normalized.includes('meta')) {
-    return {
-      key: 'goals',
-      planned: COLORS.goals.planned,
-      actual: COLORS.goals.actual
-    }
-  }
-
-  if (normalized.includes('fix')) {
-    return {
-      key: 'fixed',
-      planned: COLORS.fixed.planned,
-      actual: COLORS.fixed.actual
-    }
-  }
-
-  if (normalized.includes('mercado')) {
-    return {
-      key: 'market',
-      planned: COLORS.market.planned,
-      actual: COLORS.market.actual
-    }
-  }
-
-  if (normalized.includes('alimenta')) {
-    return {
-      key: 'food',
-      planned: COLORS.food.planned,
-      actual: COLORS.food.actual
-    }
-  }
-
-  if (normalized.includes('lazer')) {
-    return {
-      key: 'leisure',
-      planned: COLORS.leisure.planned,
-      actual: COLORS.leisure.actual
-    }
-  }
-
-  if (normalized.includes('transporte')) {
-    return {
-      key: 'transport',
-      planned: COLORS.transport.planned,
-      actual: COLORS.transport.actual
-    }
-  }
-
-  return {
-    key: 'other',
-    planned: COLORS.other.planned,
-    actual: COLORS.other.actual
-  }
+  return { key: 'other', ...COLORS.other }
 }
 
 function getTotal(data) {
@@ -364,8 +299,8 @@ function buildComparableData(projection) {
     },
     {
       name: 'Metas',
-      helper: 'Separado no mês',
-      value: Number(projection.monthlyGoalsNeed.toFixed(2))
+      helper: 'Pago de verdade',
+      value: Number((projection.goalPayments || 0).toFixed(2))
     },
     {
       name: 'Custos fixos',
@@ -403,37 +338,18 @@ function buildComparableData(projection) {
   const actual = []
 
   for (const item of plannedBase) {
-    if (item.value <= 0) {
-      continue
-    }
-
+    if (item.value <= 0) continue
     const visual = getCategoryVisual(item.name)
-
-    planned.push({
-      ...item,
-      fill: visual.planned,
-      compareKey: visual.key
-    })
+    planned.push({ ...item, fill: visual.planned, compareKey: visual.key })
   }
 
   for (const item of actualBase) {
-    if (item.value < 0) {
-      continue
-    }
-
+    if (item.value <= 0) continue
     const visual = getCategoryVisual(item.name)
-
-    actual.push({
-      ...item,
-      fill: visual.actual,
-      compareKey: visual.key
-    })
+    actual.push({ ...item, fill: visual.actual, compareKey: visual.key })
   }
 
-  return {
-    planned,
-    actual
-  }
+  return { planned, actual }
 }
 
 function buildLegendRows(planned, actual, salary) {
@@ -447,9 +363,6 @@ function buildLegendRows(planned, actual, salary) {
   for (const item of planned) {
     const currentActual = actualMap[item.compareKey]
     const actualValue = currentActual ? currentActual.value : 0
-    const salaryPercentPlanned = getPercent(item.value, salary)
-    const salaryPercentActual = getPercent(actualValue, salary)
-    const categoryProgress = item.value > 0 ? Number(((actualValue / item.value) * 100).toFixed(1)) : 0
 
     rows.push({
       compareKey: item.compareKey,
@@ -460,9 +373,9 @@ function buildLegendRows(planned, actual, salary) {
       actualValue,
       plannedHelper: item.helper,
       actualHelper: currentActual ? currentActual.helper : 'Sem gasto',
-      salaryPercentPlanned,
-      salaryPercentActual,
-      categoryProgress
+      salaryPercentPlanned: getPercent(item.value, salary),
+      salaryPercentActual: getPercent(actualValue, salary),
+      categoryProgress: item.value > 0 ? Number(((actualValue / item.value) * 100).toFixed(1)) : 0
     })
   }
 
@@ -470,9 +383,7 @@ function buildLegendRows(planned, actual, salary) {
 }
 
 function findIndexByCompareKey(data, compareKey) {
-  if (!compareKey) {
-    return -1
-  }
+  if (!compareKey) return -1
 
   for (let index = 0; index < data.length; index += 1) {
     if (data[index].compareKey === compareKey) {
@@ -484,22 +395,14 @@ function findIndexByCompareKey(data, compareKey) {
 }
 
 function renderActiveShape(props) {
-  const {
-    cx,
-    cy,
-    innerRadius,
-    outerRadius,
-    startAngle,
-    endAngle,
-    fill
-  } = props
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props
 
   return (
     <Sector
       cx={cx}
       cy={cy}
       innerRadius={innerRadius}
-      outerRadius={outerRadius + 8}
+      outerRadius={outerRadius + 6}
       startAngle={startAngle}
       endAngle={endAngle}
       fill={fill}
@@ -525,7 +428,7 @@ function CustomTooltip({ active, payload }) {
         position: 'relative',
         zIndex: 20,
         background: '#111827',
-        color: '#fff',
+        color: '#ffffff',
         padding: '10px 12px',
         borderRadius: '12px',
         boxShadow: '0 10px 30px rgba(0,0,0,0.25)'
@@ -548,6 +451,8 @@ function SpendingDonut({ projection }) {
 
   const plannedTotal = getTotal(planned)
   const actualTotal = getTotal(actual)
+  const plannedUnallocated = Math.max(0, Number((projection.salary - plannedTotal).toFixed(2)))
+  const actualRemaining = Math.max(0, Number((projection.availableAfterGoals).toFixed(2)))
 
   const legendRows = useMemo(
     () => buildLegendRows(planned, actual, projection.salary),
@@ -555,9 +460,7 @@ function SpendingDonut({ projection }) {
   )
 
   const selectedRow = useMemo(() => {
-    if (!selectedKey) {
-      return null
-    }
+    if (!selectedKey) return null
 
     for (const row of legendRows) {
       if (row.compareKey === selectedKey) {
@@ -577,16 +480,10 @@ function SpendingDonut({ projection }) {
     : `${getPercent(actualTotal, projection.salary)}%`
   const centerSubValue = selectedRow
     ? `${formatCurrency(selectedRow.actualValue)} de ${formatCurrency(selectedRow.plannedValue)}`
-    : `${formatCurrency(actualTotal)} do mês`
+    : `${formatCurrency(actualTotal)} realizado`
 
   function handleSelect(compareKey) {
-    setSelectedKey(current => {
-      if (current === compareKey) {
-        return null
-      }
-
-      return compareKey
-    })
+    setSelectedKey(current => (current === compareKey ? null : compareKey))
   }
 
   function getSliceOpacity(compareKey) {
@@ -594,7 +491,7 @@ function SpendingDonut({ projection }) {
       return 1
     }
 
-    return selectedKey === compareKey ? 1 : 0.24
+    return selectedKey === compareKey ? 1 : 0.28
   }
 
   function handlePieClick(data) {
@@ -621,7 +518,7 @@ function SpendingDonut({ projection }) {
       <Header>
         <h3>Planejado x real do mês</h3>
         <Subtitle>
-          O anel interno mostra o planejado e o externo mostra o que realmente aconteceu. Toque em uma fatia ou em uma linha da lista para comparar os dois lados.
+          O anel interno mostra o plano do mês e o externo mostra apenas o que já foi pago ou gasto de verdade.
         </Subtitle>
       </Header>
 
@@ -633,8 +530,8 @@ function SpendingDonut({ projection }) {
                 data={planned}
                 dataKey="value"
                 nameKey="name"
-                innerRadius={42}
-                outerRadius={78}
+                innerRadius={52}
+                outerRadius={92}
                 paddingAngle={2}
                 stroke="none"
                 activeIndex={plannedActiveIndex >= 0 ? plannedActiveIndex : undefined}
@@ -655,8 +552,8 @@ function SpendingDonut({ projection }) {
                 data={actual}
                 dataKey="value"
                 nameKey="name"
-                innerRadius={92}
-                outerRadius={122}
+                innerRadius={106}
+                outerRadius={146}
                 paddingAngle={2}
                 stroke="none"
                 activeIndex={actualActiveIndex >= 0 ? actualActiveIndex : undefined}
@@ -673,10 +570,7 @@ function SpendingDonut({ projection }) {
                 ))}
               </Pie>
 
-              <Tooltip
-                content={<CustomTooltip />}
-                wrapperStyle={{ zIndex: 20 }}
-              />
+              <Tooltip content={<CustomTooltip />} wrapperStyle={{ zIndex: 20 }} />
             </PieChart>
           </ResponsiveContainer>
         </ChartWrap>
@@ -722,7 +616,7 @@ function SpendingDonut({ projection }) {
         </LegendCard>
 
         <LegendCard>
-          <LegendTitle>O que de fato ocorreu</LegendTitle>
+          <LegendTitle>Realizado</LegendTitle>
 
           <LegendList>
             {legendRows.map(item => (
@@ -754,7 +648,7 @@ function SpendingDonut({ projection }) {
 
       <Footer>
         <Stat>
-          <StatLabel>Planejado total</StatLabel>
+          <StatLabel>Planejado alocado</StatLabel>
           <StatValue>{formatCurrency(plannedTotal)}</StatValue>
         </Stat>
 
@@ -764,13 +658,13 @@ function SpendingDonut({ projection }) {
         </Stat>
 
         <Stat>
-          <StatLabel>Sobra antes das metas</StatLabel>
-          <StatValue>{formatCurrency(projection.availableToSpend)}</StatValue>
+          <StatLabel>Saldo fora do plano</StatLabel>
+          <StatValue>{formatCurrency(plannedUnallocated)}</StatValue>
         </Stat>
 
         <Stat>
-          <StatLabel>Sobra real após metas</StatLabel>
-          <StatValue>{formatCurrency(projection.availableAfterGoals)}</StatValue>
+          <StatLabel>Sobra real atual</StatLabel>
+          <StatValue>{formatCurrency(actualRemaining)}</StatValue>
         </Stat>
       </Footer>
     </Card>

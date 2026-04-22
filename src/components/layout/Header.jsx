@@ -1,6 +1,6 @@
+import { useMemo } from 'react'
 import styled from 'styled-components'
 import ThemeToggle from '../common/ThemeToggle'
-import { useUser } from '../../context/UserContext'
 
 const Wrapper = styled.div`
   display: flex;
@@ -26,14 +26,29 @@ const Subtitle = styled.span`
 `
 
 function Header({ title }) {
-  const { selectedUser } = useUser()
+  const currentUser = useMemo(() => {
+    const rawUser = localStorage.getItem('user')
+
+    if (!rawUser) {
+      return null
+    }
+
+    try {
+      return JSON.parse(rawUser)
+    } catch {
+      return null
+    }
+  }, [])
 
   return (
     <Wrapper>
       <TitleBox>
         <Title>{title}</Title>
-        <Subtitle>Perfil atual: {selectedUser}</Subtitle>
+        <Subtitle>
+          Perfil atual: {currentUser?.name || currentUser?.email || 'Usuário'}
+        </Subtitle>
       </TitleBox>
+
       <ThemeToggle />
     </Wrapper>
   )
