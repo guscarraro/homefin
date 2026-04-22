@@ -8,10 +8,20 @@ const Header = styled.div`
   gap: 6px;
 `
 
+const Eyebrow = styled.span`
+  font-size: 13px;
+  color: ${({ theme }) => theme.colors.textSoft};
+`
+
 const MainValue = styled.div`
   font-size: 34px;
   font-weight: 800;
-  margin-top: 8px;
+  margin-top: 4px;
+`
+
+const Description = styled.p`
+  color: ${({ theme }) => theme.colors.textSoft};
+  line-height: 1.45;
 `
 
 const Grid = styled.div`
@@ -44,7 +54,9 @@ function BalanceHero({ projection }) {
       <Card>
         <Header>
           <h2>Sem projeção do mês</h2>
-          <p>Cadastrem os salários para liberar o quanto ainda pode gastar, investir e reservar.</p>
+          <Description>
+            Cadastrem os salários para liberar o painel inteligente com saldo, metas, investimento e comparação entre planejado e real.
+          </Description>
         </Header>
       </Card>
     )
@@ -53,49 +65,33 @@ function BalanceHero({ projection }) {
   return (
     <Card>
       <Header>
-        <span>Saldo livre do mês</span>
-        <MainValue>{formatCurrency(projection.availableToSpend)}</MainValue>
+        <Eyebrow>Indicador principal do mês</Eyebrow>
+        <h2>Saldo estratégico</h2>
+        <MainValue>{formatCurrency(projection.availableAfterGoals)}</MainValue>
+        <Description>
+          Esse valor mostra o que realmente sobra depois de custos fixos, variáveis, investimentos já feitos e metas mensais.
+        </Description>
       </Header>
 
       <Grid>
         <Block>
-          <Label>Despesas do mês</Label>
-          <Value>{formatCurrency(projection.expenses)}</Value>
+          <Label>Salário total</Label>
+          <Value>{formatCurrency(projection.salary)}</Value>
         </Block>
 
         <Block>
-          <Label>Custos fixos</Label>
-          <Value>{formatCurrency(projection.fixedCosts)}</Value>
+          <Label>Comprometido no mês</Label>
+          <Value>{formatCurrency(projection.expenses + projection.investments)}</Value>
         </Block>
 
         <Block>
-          <Label>Investimento sugerido</Label>
-          <Value>{formatCurrency(projection.investmentSuggested)}</Value>
+          <Label>Meta mensal para objetivos</Label>
+          <Value>{formatCurrency(projection.monthlyGoalsNeed)}</Value>
         </Block>
 
         <Block>
-          <Label>Lazer sugerido</Label>
-          <Value>{formatCurrency(projection.leisureSuggested)}</Value>
-        </Block>
-
-        <Block>
-          <Label>Teto diário</Label>
-          <Value>{formatCurrency(projection.dailyLimit)}</Value>
-        </Block>
-
-        <Block>
-          <Label>Comida por semana</Label>
-          <Value>{formatCurrency(projection.weeklyFoodLimit)}</Value>
-        </Block>
-
-        <Block>
-          <Label>Próximo mês comprometido</Label>
+          <Label>Próximo mês já comprometido</Label>
           <Value>{formatCurrency(projection.nextMonthCommitted)}</Value>
-        </Block>
-
-        <Block>
-          <Label>Parcelas no próximo mês</Label>
-          <Value>{formatCurrency(projection.nextMonthInstallments)}</Value>
         </Block>
       </Grid>
     </Card>

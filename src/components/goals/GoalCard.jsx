@@ -61,7 +61,7 @@ function GoalCard({ goal }) {
             dentro do prazo.
           </p>
           <p style={{ marginTop: 6 }}>
-            Regra prática: segurem lazer mais caro e compras soltas quando o mês apertar.
+            Regra prática: aportem primeiro, deixem compras variáveis e lazer para depois.
           </p>
         </PlanBox>
       ) : (
@@ -71,7 +71,7 @@ function GoalCard({ goal }) {
             Hoje faltam {formatCurrency(simulation.gap)} por mês para bater essa meta no prazo.
           </p>
           <p style={{ marginTop: 6 }}>
-            Caminho honesto: reduzir gasto variável, alongar o prazo ou baixar a meta.
+            Caminho honesto: reduzir gasto variável, alongar o prazo ou baixar o valor da meta.
           </p>
           {simulation.estimatedMonths > 0 && (
             <p style={{ marginTop: 6 }}>

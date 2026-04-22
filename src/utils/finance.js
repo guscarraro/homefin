@@ -1,36 +1,17 @@
 import {
   addMonthsToMonthKey,
-  getCurrentMonthKey,
   getMonthKeyFromDate,
-  getRemainingDaysInMonth,
-  getRemainingWeeksInMonth
+  getNextMonthKey,
+  getTodayDayOfMonth,
+  getDaysInMonthFromKey,
+  padMonth
 } from './date'
 
-export function getMonthSalary(salaries, monthKey = getCurrentMonthKey()) {
-  for (const item of salaries) {
-    if (item.month === monthKey) {
-      return item
-    }
-  }
-
-  return null
-}
-
-export function getTotalSalaryForMonth(salaries, monthKey = getCurrentMonthKey()) {
-  const salary = getMonthSalary(salaries, monthKey)
-
-  if (!salary) {
-    return 0
-  }
-
-  return Number(salary.gustavo || 0) + Number(salary.marccella || 0)
-}
-
-export function sumFixedCosts(fixedCosts) {
+function getSalaryForMonth(salaries, monthKey) {
   let total = 0
 
-  for (const item of fixedCosts) {
-    if (item.active) {
+  for (const item of salaries || []) {
+    if (item.month === monthKey) {
       total += Number(item.amount || 0)
     }
   }
@@ -38,181 +19,712 @@ export function sumFixedCosts(fixedCosts) {
   return total
 }
 
-export function getExpenseValueForMonth(entry, monthKey) {
-  if (entry.type !== 'expense') {
-    return 0
+function hasSkippedMonth(item, monthKey) {
+  if (!item?.skippedMonths?.length) {
+    return false
   }
 
+  for (const skippedMonth of item.skippedMonths) {
+    if (skippedMonth === monthKey) {
+      return true
+    }
+  }
+
+  return false
+}
+
+function getActiveFixedCostsTotal(fixedCosts, monthKey) {
+  let total = 0
+
+  for (const item of fixedCosts || []) {
+    if (!item.active) {
+      continue
+    }
+
+    if (monthKey && hasSkippedMonth(item, monthKey)) {
+      continue
+    }
+
+    total += Number(item.amount || 0)
+  }
+
+  return total
+}
+
+function isEntryVisibleInMonth(entry, monthKey) {
+  const entryMonth = getMonthKeyFromDate(entry.date)
+
+  if (entry.isRecurring && entryMonth <= monthKey && !hasSkippedMonth(entry, monthKey)) {
+    return true
+  }
+
+  if (entry.isInstallment) {
+    const startMonth = entry.installmentStartMonth || entryMonth
+    const totalInstallments = Number(entry.installmentCount || 1)
+
+    for (let index = 0; index < totalInstallments; index += 1) {
+      const installmentMonth = addMonthsToMonthKey(startMonth, index)
+
+      if (installmentMonth === monthKey && !hasSkippedMonth(entry, monthKey)) {
+        return true
+      }
+    }
+  }
+
+  return entryMonth === monthKey
+}
+
+function getInstallmentPositionInMonth(entry, monthKey) {
   if (!entry.isInstallment) {
-    const entryMonth = getMonthKeyFromDate(entry.date)
-    return entryMonth === monthKey ? Number(entry.amount || 0) : 0
+    return 1
   }
 
-  const startMonth = entry.installmentStartMonth
-  const installmentCount = Number(entry.installmentCount || 1)
-  const installmentAmount = Number(entry.installmentAmount || 0)
+  const entryMonth = getMonthKeyFromDate(entry.date)
+  const startMonth = entry.installmentStartMonth || entryMonth
+  const totalInstallments = Number(entry.installmentCount || 1)
 
-  for (let index = 0; index < installmentCount; index += 1) {
-    const currentInstallmentMonth = addMonthsToMonthKey(startMonth, index)
+  for (let index = 0; index < totalInstallments; index += 1) {
+    const installmentMonth = addMonthsToMonthKey(startMonth, index)
 
-    if (currentInstallmentMonth === monthKey) {
-      return installmentAmount
+    if (installmentMonth === monthKey) {
+      return index + 1
+    }
+  }
+
+  return 1
+}
+
+function getInstallmentAmountInMonth(entry, monthKey) {
+  if (!entry.isInstallment) {
+    return Number(entry.amount || 0)
+  }
+
+  const entryMonth = getMonthKeyFromDate(entry.date)
+  const startMonth = entry.installmentStartMonth || entryMonth
+  const totalInstallments = Number(entry.installmentCount || 1)
+
+  for (let index = 0; index < totalInstallments; index += 1) {
+    const installmentMonth = addMonthsToMonthKey(startMonth, index)
+
+    if (installmentMonth === monthKey && !hasSkippedMonth(entry, monthKey)) {
+      return Number(entry.installmentAmount || 0)
     }
   }
 
   return 0
 }
 
-export function sumExpensesForMonth(entries, monthKey = getCurrentMonthKey()) {
-  let total = 0
-
-  for (const item of entries) {
-    total += getExpenseValueForMonth(item, monthKey)
-  }
-
-  return total
+function buildVirtualFixedCostDate(monthKey, dueDay) {
+  const [year, month] = monthKey.split('-')
+  const day = padMonth(Number(dueDay || 1))
+  return `${year}-${month}-${day}`
 }
 
-export function getCategoryTotalsForMonth(entries, monthKey = getCurrentMonthKey()) {
-  const totals = {}
+export function getEntriesForMonthView(entries, monthKey) {
+  const result = []
 
-  for (const item of entries) {
-    const value = getExpenseValueForMonth(item, monthKey)
-
-    if (value <= 0) {
+  for (const entry of entries || []) {
+    if (!isEntryVisibleInMonth(entry, monthKey)) {
       continue
     }
 
-    if (!totals[item.category]) {
-      totals[item.category] = 0
-    }
+    const visibleAmount = getInstallmentAmountInMonth(entry, monthKey)
+    const installmentNumber = getInstallmentPositionInMonth(entry, monthKey)
 
-    totals[item.category] += value
-  }
-
-  const result = []
-
-  for (const category in totals) {
     result.push({
-      name: category,
-      value: totals[category]
+      ...entry,
+      visibleAmount,
+      installmentNumber,
+      installmentLabel: entry.isInstallment
+        ? `${installmentNumber}/${Number(entry.installmentCount || 1)}`
+        : null
     })
   }
 
   return result
 }
 
-export function getInstallmentsForMonth(entries, monthKey = getCurrentMonthKey()) {
-  const result = []
+function getMonthlyGoalsNeed(goals) {
+  let total = 0
 
-  for (const item of entries) {
-    if (!item.isInstallment) {
+  for (const goal of goals || []) {
+    const targetAmount = Number(goal.targetAmount || 0)
+    const targetMonths = Number(goal.targetMonths || 0)
+
+    if (targetAmount > 0 && targetMonths > 0) {
+      total += targetAmount / targetMonths
+    }
+  }
+
+  return Number(total.toFixed(2))
+}
+
+function getTotals(entriesForMonth, fixedCosts, monthKey) {
+  let variableExpenses = 0
+  let investments = 0
+
+  for (const entry of entriesForMonth) {
+    const amount = Number(entry.visibleAmount || entry.amount || 0)
+
+    if (entry.type === 'investment') {
+      investments += amount
       continue
     }
 
-    const installmentCount = Number(item.installmentCount || 1)
+    variableExpenses += amount
+  }
 
-    for (let index = 0; index < installmentCount; index += 1) {
-      const installmentMonth = addMonthsToMonthKey(item.installmentStartMonth, index)
+  const fixedCostsTotal = getActiveFixedCostsTotal(fixedCosts, monthKey)
 
-      if (installmentMonth === monthKey) {
-        result.push({
-          id: `${item.id}-${index + 1}`,
-          title: item.note || item.category,
-          category: item.category,
-          amount: Number(item.installmentAmount || 0),
-          currentInstallment: index + 1,
-          totalInstallments: installmentCount,
-          account: item.account,
-          userId: item.userId
-        })
+  return {
+    fixedCosts: Number(fixedCostsTotal.toFixed(2)),
+    variableExpenses: Number(variableExpenses.toFixed(2)),
+    investments: Number(investments.toFixed(2)),
+    expenses: Number((fixedCostsTotal + variableExpenses).toFixed(2))
+  }
+}
+
+function getCategorySpent(entriesForMonth, categories) {
+  const totals = {}
+
+  for (const category of categories) {
+    totals[category] = 0
+  }
+
+  for (const entry of entriesForMonth) {
+    if (entry.type !== 'expense') {
+      continue
+    }
+
+    const category = entry.category || 'Outros'
+    const amount = Number(entry.visibleAmount || entry.amount || 0)
+
+    if (totals[category] === undefined) {
+      totals[category] = 0
+    }
+
+    totals[category] += amount
+  }
+
+  return totals
+}
+
+function clampBudget(value, minValue, maxValue) {
+  if (value < minValue) return minValue
+  if (value > maxValue) return maxValue
+  return value
+}
+
+function buildLifestyleBudgets(salary, availableAfterGoals) {
+  if (salary <= 0 || availableAfterGoals <= 0) {
+    return {
+      marketBudget: 0,
+      foodBudget: 0,
+      leisureBudget: 0,
+      transportBudget: 0,
+      otherBudget: 0
+    }
+  }
+
+  const marketBase = salary * 0.1
+  const foodBase = salary * 0.05
+  const leisureBase = salary * 0.06
+  const transportBase = salary * 0.08
+  const otherBase = salary * 0.04
+
+  const totalBase =
+    marketBase +
+    foodBase +
+    leisureBase +
+    transportBase +
+    otherBase
+
+  const pressureFactor =
+    totalBase > 0
+      ? Math.min(1, availableAfterGoals / totalBase)
+      : 1
+
+  const marketBudget = clampBudget(
+    Number((marketBase * pressureFactor).toFixed(2)),
+    0,
+    Number((salary * 0.12).toFixed(2))
+  )
+
+  const foodBudget = clampBudget(
+    Number((foodBase * pressureFactor).toFixed(2)),
+    0,
+    Number((salary * 0.06).toFixed(2))
+  )
+
+  const leisureBudget = clampBudget(
+    Number((leisureBase * pressureFactor).toFixed(2)),
+    0,
+    Number((salary * 0.08).toFixed(2))
+  )
+
+  const transportBudget = clampBudget(
+    Number((transportBase * pressureFactor).toFixed(2)),
+    0,
+    Number((salary * 0.1).toFixed(2))
+  )
+
+  const otherBudget = clampBudget(
+    Number((otherBase * pressureFactor).toFixed(2)),
+    0,
+    Number((salary * 0.05).toFixed(2))
+  )
+
+  return {
+    marketBudget,
+    foodBudget,
+    leisureBudget,
+    transportBudget,
+    otherBudget
+  }
+}
+
+function getSuggestedInvestment(salary, fixedCosts, variableExpenses) {
+  if (salary <= 0) {
+    return {
+      minimumInvestment: 0,
+      recommendedInvestment: 0,
+      aggressiveInvestment: 0
+    }
+  }
+
+  const minimumInvestment = Number((salary * 0.1).toFixed(2))
+  const committedBeforeInvestment = fixedCosts + variableExpenses
+  const remainingBeforeInvestment = salary - committedBeforeInvestment
+
+  if (remainingBeforeInvestment <= 0) {
+    return {
+      minimumInvestment,
+      recommendedInvestment: 0,
+      aggressiveInvestment: 0
+    }
+  }
+
+  let recommendedPercent = 0.15
+
+  if (fixedCosts > salary * 0.35) {
+    recommendedPercent = 0.12
+  }
+
+  if (fixedCosts > salary * 0.45) {
+    recommendedPercent = 0.1
+  }
+
+  const recommendedInvestment = Math.max(
+    minimumInvestment,
+    Number((salary * recommendedPercent).toFixed(2))
+  )
+
+  const aggressiveInvestment = Number((salary * 0.2).toFixed(2))
+
+  return {
+    minimumInvestment,
+    recommendedInvestment: Math.min(recommendedInvestment, remainingBeforeInvestment),
+    aggressiveInvestment: Math.min(aggressiveInvestment, remainingBeforeInvestment)
+  }
+}
+
+export function buildMonthlyProjection(financeData, monthKey) {
+  const salary = getSalaryForMonth(financeData.salaries, monthKey)
+  const entriesForMonth = getEntriesForMonthView(financeData.entries, monthKey)
+  const totals = getTotals(entriesForMonth, financeData.fixedCosts || [], monthKey)
+  const monthlyGoalsNeed = getMonthlyGoalsNeed(financeData.goals || [])
+
+  const investmentPlan = getSuggestedInvestment(
+    salary,
+    totals.fixedCosts,
+    totals.variableExpenses
+  )
+
+  const investmentSuggested = investmentPlan.minimumInvestment
+  const recommendedInvestment = Number(investmentPlan.recommendedInvestment.toFixed(2))
+  const aggressiveInvestment = Number(investmentPlan.aggressiveInvestment.toFixed(2))
+
+  const investmentActual = totals.investments
+  const remainingInvestmentGoal = Math.max(
+    0,
+    Number((investmentSuggested - investmentActual).toFixed(2))
+  )
+
+  const availableToSpend = Number((salary - totals.expenses - totals.investments).toFixed(2))
+  const availableAfterGoals = Number((availableToSpend - monthlyGoalsNeed).toFixed(2))
+
+  const daysInMonth = getDaysInMonthFromKey(monthKey)
+  const todayDay = getTodayDayOfMonth(monthKey)
+  const remainingDays = Math.max(1, daysInMonth - todayDay + 1)
+
+  const weeklyBudget = availableAfterGoals > 0 ? Number((availableAfterGoals / 4).toFixed(2)) : 0
+  const dailyLimit = availableAfterGoals > 0 ? Number((availableAfterGoals / remainingDays).toFixed(2)) : 0
+
+  const lifestyleBudgets = buildLifestyleBudgets(salary, availableAfterGoals)
+
+  const categorySpent = getCategorySpent(entriesForMonth, [
+    'Mercado',
+    'Alimentação',
+    'Lazer',
+    'Transporte',
+    'Combustível',
+    'Outros',
+    'Compras'
+  ])
+
+  const nextMonthKey = getNextMonthKey(monthKey)
+  const nextMonthEntries = getEntriesForMonthView(financeData.entries, nextMonthKey)
+
+  let nextMonthCommitted = getActiveFixedCostsTotal(financeData.fixedCosts || [], nextMonthKey)
+  let nextMonthInstallments = 0
+
+  for (const entry of nextMonthEntries) {
+    const amount = Number(entry.visibleAmount || entry.amount || 0)
+
+    if (entry.type === 'expense') {
+      nextMonthCommitted += amount
+
+      if (entry.isInstallment) {
+        nextMonthInstallments += amount
       }
     }
+
+    if (entry.type === 'investment' && entry.isRecurring) {
+      nextMonthCommitted += amount
+    }
+  }
+
+  const investedAboveMinimum = Math.max(
+    0,
+    Number((investmentActual - investmentSuggested).toFixed(2))
+  )
+
+  return {
+    month: monthKey,
+    hasSalary: salary > 0,
+    salary,
+    expenses: totals.expenses,
+    fixedCosts: totals.fixedCosts,
+    variableExpenses: totals.variableExpenses,
+    investments: totals.investments,
+    investmentSuggested,
+    recommendedInvestment,
+    aggressiveInvestment,
+    investedAboveMinimum,
+    remainingInvestmentGoal,
+    monthlyGoalsNeed,
+    availableToSpend,
+    availableAfterGoals,
+    weeklyBudget,
+    dailyLimit,
+    marketBudget: lifestyleBudgets.marketBudget,
+    foodBudget: lifestyleBudgets.foodBudget,
+    leisureBudget: lifestyleBudgets.leisureBudget,
+    transportBudget: lifestyleBudgets.transportBudget,
+    otherBudget: lifestyleBudgets.otherBudget,
+    marketSpent: Number((categorySpent.Mercado || 0).toFixed(2)),
+    foodSpent: Number((categorySpent.Alimentação || 0).toFixed(2)),
+    leisureSpent: Number((categorySpent.Lazer || 0).toFixed(2)),
+    transportSpent: Number(
+      (((categorySpent.Transporte || 0) + (categorySpent.Combustível || 0))).toFixed(2)
+    ),
+    otherSpent: Number(
+      (((categorySpent.Outros || 0) + (categorySpent.Compras || 0))).toFixed(2)
+    ),
+    nextMonthCommitted: Number(nextMonthCommitted.toFixed(2)),
+    nextMonthInstallments: Number(nextMonthInstallments.toFixed(2))
+  }
+}
+
+export function buildSuggestions(projection, goals) {
+  const items = []
+
+  if (!projection.hasSalary) {
+    items.push({
+      id: 'no-salary',
+      tone: 'warning',
+      icon: 'calendar',
+      title: 'Salários ainda não informados',
+      text: 'Cadastrem os salários do mês para o sistema calcular metas, custos fixos, parcelas e limites reais.'
+    })
+
+    return items
+  }
+
+  if (projection.investments >= projection.investmentSuggested && projection.investmentSuggested > 0) {
+    items.push({
+      id: 'investment-hit',
+      tone: 'success',
+      icon: 'shield',
+      title: 'Meta mínima de investimento batida',
+      text: `Vocês já aportaram ${projection.investments.toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      })} no mês. O mínimo saudável era ${projection.investmentSuggested.toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      })}.`
+    })
+
+    if (projection.investedAboveMinimum > 0) {
+      items.push({
+        id: 'investment-above-minimum',
+        tone: 'success',
+        icon: 'target',
+        title: 'Investimento acima do mínimo',
+        text: `Além do piso, ainda foi colocado ${projection.investedAboveMinimum.toLocaleString('pt-BR', {
+          style: 'currency',
+          currency: 'BRL'
+        })} acima da meta mínima. Bonito, elegante e disciplinado.`
+      })
+    }
+  } else {
+    items.push({
+      id: 'investment-missing',
+      tone: 'warning',
+      icon: 'target',
+      title: 'Meta mínima de investimento ainda não foi batida',
+      text: `Ainda faltam ${projection.remainingInvestmentGoal.toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      })} para alcançar os 10% mínimos de aporte do mês.`
+    })
+  }
+
+  items.push({
+    id: 'investment-training',
+    tone: 'default',
+    icon: 'shield',
+    title: 'Régua ideal de aporte',
+    text: `Piso: ${projection.investmentSuggested.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    })}. Recomendado: ${projection.recommendedInvestment.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    })}. Forte: ${projection.aggressiveInvestment.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    })}.`
+  })
+
+  if (projection.monthlyGoalsNeed > 0) {
+    items.push({
+      id: 'goals-month-need',
+      tone: projection.availableAfterGoals >= 0 ? 'success' : 'danger',
+      icon: 'goal',
+      title: 'Reserva mensal para bater metas',
+      text:
+        projection.availableAfterGoals >= 0
+          ? `Para cumprir os prazos das metas, o ideal é separar ${projection.monthlyGoalsNeed.toLocaleString('pt-BR', {
+              style: 'currency',
+              currency: 'BRL'
+            })} neste mês.`
+          : `Para cumprir os prazos das metas, seria preciso separar ${projection.monthlyGoalsNeed.toLocaleString('pt-BR', {
+              style: 'currency',
+              currency: 'BRL'
+            })}, mas o orçamento atual ainda não sustenta isso.`
+    })
+  }
+
+  items.push({
+    id: 'market-budget',
+    tone: projection.marketSpent > projection.marketBudget ? 'warning' : 'default',
+    icon: 'food',
+    title: 'Mercado',
+    text: `Teto saudável: ${projection.marketBudget.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    })}. Gasto atual: ${projection.marketSpent.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    })}.`
+  })
+
+  items.push({
+    id: 'food-budget',
+    tone: projection.foodSpent > projection.foodBudget ? 'warning' : 'default',
+    icon: 'coffee',
+    title: 'Alimentação fora',
+    text: `Teto saudável: ${projection.foodBudget.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    })}. Gasto atual: ${projection.foodSpent.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    })}.`
+  })
+
+  items.push({
+    id: 'leisure-budget',
+    tone: projection.leisureSpent > projection.leisureBudget ? 'warning' : 'default',
+    icon: 'trend',
+    title: 'Lazer',
+    text: `Teto saudável: ${projection.leisureBudget.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    })}. Gasto atual: ${projection.leisureSpent.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    })}.`
+  })
+
+  items.push({
+    id: 'transport-budget',
+    tone: projection.transportSpent > projection.transportBudget ? 'warning' : 'default',
+    icon: 'calendar',
+    title: 'Transporte',
+    text: `Teto saudável: ${projection.transportBudget.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    })}. Gasto atual: ${projection.transportSpent.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    })}.`
+  })
+
+  items.push({
+    id: 'weekly-control',
+    tone: 'default',
+    icon: 'calendar',
+    title: 'Controle do restante do mês',
+    text: `Depois dos compromissos do mês, a régua fica em ${projection.weeklyBudget.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    })} por semana e ${projection.dailyLimit.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    })} por dia.`
+  })
+
+  if (projection.availableAfterGoals < 0) {
+    items.push({
+      id: 'month-negative-after-goals',
+      tone: 'danger',
+      icon: 'danger',
+      title: 'O mês está pressionado',
+      text: 'No ritmo atual, o ideal é cortar primeiro compras soltas, alimentação fora e lazer até o saldo voltar a respirar.'
+    })
+  } else {
+    items.push({
+      id: 'month-positive-after-goals',
+      tone: 'success',
+      icon: 'shield',
+      title: 'Ainda existe respiro',
+      text: `Depois dos compromissos, ainda sobram ${projection.availableAfterGoals.toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      })}.`
+    })
+  }
+
+  if (projection.nextMonthInstallments > 0) {
+    items.push({
+      id: 'next-month-installments',
+      tone: 'warning',
+      icon: 'calendar',
+      title: 'Próximo mês já começa pressionado',
+      text: `O próximo mês já nasce com ${projection.nextMonthInstallments.toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      })} em parcelas.`
+    })
+  }
+
+  if (goals?.length) {
+    items.push({
+      id: 'routine-advice',
+      tone: 'default',
+      icon: 'target',
+      title: 'Ordem ideal do dinheiro',
+      text: 'Paga o fixo, garante aporte, separa metas, respeita tetos variáveis e só depois libera o resto. A matemática não gosta de emoção.'
+    })
+  }
+
+  return items
+}
+
+export function getCategoryTotalsForMonth(entries, monthKey) {
+  const entriesForMonth = getEntriesForMonthView(entries, monthKey)
+  const totalsMap = {}
+
+  for (const entry of entriesForMonth) {
+    if (entry.type !== 'expense') {
+      continue
+    }
+
+    const categoryName = entry.category || 'Outros'
+    const amount = Number(entry.visibleAmount || entry.amount || 0)
+
+    if (!totalsMap[categoryName]) {
+      totalsMap[categoryName] = 0
+    }
+
+    totalsMap[categoryName] += amount
+  }
+
+  const result = []
+
+  for (const categoryName in totalsMap) {
+    result.push({
+      name: categoryName,
+      value: Number(totalsMap[categoryName].toFixed(2))
+    })
+  }
+
+  result.sort((a, b) => b.value - a.value)
+
+  return result
+}
+
+export function getInstallmentsForMonth(entries, monthKey) {
+  const result = []
+
+  for (const entry of entries || []) {
+    if (!entry.isInstallment) {
+      continue
+    }
+
+    const visibleAmount = getInstallmentAmountInMonth(entry, monthKey)
+
+    if (!visibleAmount) {
+      continue
+    }
+
+    result.push({
+      ...entry,
+      visibleAmount
+    })
   }
 
   return result
 }
 
-export function buildMonthlyProjection(data) {
-  const currentMonth = getCurrentMonthKey()
-  const nextMonth = addMonthsToMonthKey(currentMonth, 1)
-
-  const salaryTotal = getTotalSalaryForMonth(data.salaries, currentMonth)
-
-  if (!salaryTotal) {
-    return {
-      hasSalary: false,
-      currentMonth,
-      nextMonth,
-      salaryTotal: 0,
-      expenses: 0,
-      fixedCosts: 0,
-      investmentSuggested: 0,
-      leisureSuggested: 0,
-      availableToSpend: 0,
-      dailyLimit: 0,
-      weeklyFoodLimit: 0,
-      nextMonthCommitted: 0,
-      nextMonthInstallments: 0,
-      nextMonthFixedCosts: 0
-    }
-  }
-
-  const expenses = sumExpensesForMonth(data.entries, currentMonth)
-  const fixedCosts = sumFixedCosts(data.fixedCosts)
-  const investmentSuggested = salaryTotal * 0.1
-  const leisureSuggested = salaryTotal * 0.08
-
-  const availableToSpend =
-    salaryTotal -
-    expenses -
-    fixedCosts -
-    investmentSuggested -
-    leisureSuggested
-
-  const dailyLimit = availableToSpend / getRemainingDaysInMonth()
-  const weeklyFoodLimit = Math.max(availableToSpend * 0.22 / getRemainingWeeksInMonth(), 0)
-
-  const nextMonthInstallments = sumExpensesForMonth(data.entries, nextMonth)
-  const nextMonthFixedCosts = sumFixedCosts(data.fixedCosts)
-  const nextMonthCommitted = nextMonthInstallments + nextMonthFixedCosts
-
-  return {
-    hasSalary: true,
-    currentMonth,
-    nextMonth,
-    salaryTotal,
-    expenses,
-    fixedCosts,
-    investmentSuggested,
-    leisureSuggested,
-    availableToSpend,
-    dailyLimit,
-    weeklyFoodLimit,
-    nextMonthCommitted,
-    nextMonthInstallments,
-    nextMonthFixedCosts
-  }
-}
-
 export function simulateGoal(goal, projection) {
+  const targetAmount = Number(goal?.targetAmount || 0)
+  const targetMonths = Number(goal?.targetMonths || 0)
+
   const monthlyNeed =
-    Number(goal.targetAmount || 0) / Math.max(Number(goal.targetMonths || 1), 1)
+    targetAmount > 0 && targetMonths > 0
+      ? Number((targetAmount / targetMonths).toFixed(2))
+      : 0
 
-  const suggestedReserve = Math.max(projection.availableToSpend * 0.3, 0)
-  const isViable = suggestedReserve >= monthlyNeed
+  const suggestedReserve = Math.max(
+    0,
+    Number(
+      Math.min(
+        projection.availableAfterGoals > 0 ? projection.availableAfterGoals : 0,
+        monthlyNeed > 0 ? monthlyNeed : 0
+      ).toFixed(2)
+    )
+  )
 
-  let gap = 0
-
-  if (monthlyNeed > suggestedReserve) {
-    gap = monthlyNeed - suggestedReserve
-  }
-
-  let estimatedMonths = 0
-
-  if (suggestedReserve > 0) {
-    estimatedMonths = Math.ceil(Number(goal.targetAmount || 0) / suggestedReserve)
-  }
+  const isViable = projection.availableAfterGoals >= monthlyNeed && monthlyNeed > 0
+  const gap = Math.max(0, Number((monthlyNeed - projection.availableAfterGoals).toFixed(2)))
+  const estimatedMonths =
+    projection.availableAfterGoals > 0
+      ? Math.ceil(targetAmount / projection.availableAfterGoals)
+      : 0
 
   return {
     monthlyNeed,
@@ -223,93 +735,141 @@ export function simulateGoal(goal, projection) {
   }
 }
 
-export function buildSuggestions(projection, goals) {
-  if (!projection.hasSalary) {
-    return [
-      {
-        id: 'salary-missing',
-        tone: 'warning',
-        icon: 'wallet',
-        title: 'Sem projeção liberada',
-        text: 'Cadastrem os salários do mês para o app calcular quanto ainda dá para gastar com segurança.'
-      }
-    ]
-  }
+export function getProjectionDonutData(projection) {
+  const planned = [
+    {
+      name: 'Custos fixos',
+      value: Number(projection.fixedCosts.toFixed(2))
+    },
+    {
+      name: 'Investimento ideal',
+      value: Number((projection.aggressiveInvestment || projection.investmentSuggested || 0).toFixed(2))
+    },
+    {
+      name: 'Metas mensais',
+      value: Number(projection.monthlyGoalsNeed.toFixed(2))
+    },
+    {
+      name: 'Mercado',
+      value: Number(projection.marketBudget.toFixed(2))
+    },
+    {
+      name: 'Alimentação',
+      value: Number(projection.foodBudget.toFixed(2))
+    },
+    {
+      name: 'Lazer',
+      value: Number(projection.leisureBudget.toFixed(2))
+    },
+    {
+      name: 'Transporte',
+      value: Number(projection.transportBudget.toFixed(2))
+    },
+    {
+      name: 'Outros',
+      value: Number(projection.otherBudget.toFixed(2))
+    }
+  ]
 
-  const suggestions = []
+  const actual = [
+    {
+      name: 'Custos fixos',
+      value: Number(projection.fixedCosts.toFixed(2))
+    },
+    {
+      name: 'Investimentos',
+      value: Number(projection.investments.toFixed(2))
+    },
+    {
+      name: 'Mercado',
+      value: Number(projection.marketSpent.toFixed(2))
+    },
+    {
+      name: 'Alimentação',
+      value: Number(projection.foodSpent.toFixed(2))
+    },
+    {
+      name: 'Lazer',
+      value: Number(projection.leisureSpent.toFixed(2))
+    },
+    {
+      name: 'Transporte',
+      value: Number(projection.transportSpent.toFixed(2))
+    },
+    {
+      name: 'Outros',
+      value: Number(projection.otherSpent.toFixed(2))
+    }
+  ]
 
-  if (projection.availableToSpend >= 2000) {
-    suggestions.push({
-      id: 'status-safe',
-      tone: 'success',
-      icon: 'shield',
-      title: 'Mês sob controle',
-      text: 'Vocês ainda têm uma folga boa. Dá para viver o mês sem aperto, desde que não inventem moda de última hora.'
-    })
-  } else if (projection.availableToSpend > 0) {
-    suggestions.push({
-      id: 'status-attention',
-      tone: 'warning',
-      icon: 'alert',
-      title: 'Atenção no restante do mês',
-      text: 'Ainda existe saldo, mas já vale segurar gasto por impulso e compras emocionais.'
-    })
-  } else {
-    suggestions.push({
-      id: 'status-danger',
-      tone: 'danger',
-      icon: 'danger',
-      title: 'Orçamento no vermelho técnico',
-      text: 'O saldo livre acabou ou ficou negativo. Aqui o ideal é travar lazer e cortar o que não for essencial.'
-    })
-  }
+  const filteredPlanned = []
+  const filteredActual = []
 
-  suggestions.push({
-    id: 'food-plan',
-    tone: projection.weeklyFoodLimit > 0 ? 'success' : 'warning',
-    icon: 'food',
-    title: 'Meta semanal de comida',
-    text: `Para alimentação, tentem ficar perto de R$ ${projection.weeklyFoodLimit.toFixed(2).replace('.', ',')} por semana até fechar o mês.`
-  })
-
-  suggestions.push({
-    id: 'invest-plan',
-    tone: 'info',
-    icon: 'target',
-    title: 'Reserva sugerida',
-    text: `O app sugere separar R$ ${projection.investmentSuggested.toFixed(2).replace('.', ',')} para investimento e R$ ${projection.leisureSuggested.toFixed(2).replace('.', ',')} para lazer.`
-  })
-
-  suggestions.push({
-    id: 'next-month',
-    tone: projection.nextMonthCommitted > projection.salaryTotal * 0.65 ? 'warning' : 'info',
-    icon: 'calendar',
-    title: 'Próximo mês já comprometido',
-    text: `No próximo mês vocês já entram com R$ ${projection.nextMonthCommitted.toFixed(2).replace('.', ',')} comprometidos entre fixos e parcelas.`
-  })
-
-  if (goals.length > 0) {
-    const firstGoal = goals[0]
-    const simulation = simulateGoal(firstGoal, projection)
-
-    if (simulation.isViable) {
-      suggestions.push({
-        id: 'goal-ok',
-        tone: 'success',
-        icon: 'goal',
-        title: `Meta possível: ${firstGoal.title}`,
-        text: `Mantendo a reserva de R$ ${simulation.suggestedReserve.toFixed(2).replace('.', ',')} por mês, vocês conseguem bater essa meta no prazo.`
-      })
-    } else {
-      suggestions.push({
-        id: 'goal-gap',
-        tone: 'warning',
-        icon: 'goal',
-        title: `Meta apertada: ${firstGoal.title}`,
-        text: `Para bater essa meta no prazo, falta encaixar mais R$ ${simulation.gap.toFixed(2).replace('.', ',')} por mês no orçamento.`
-      })
+  for (const item of planned) {
+    if (item.value > 0) {
+      filteredPlanned.push(item)
     }
   }
 
-  return suggestions
+  for (const item of actual) {
+    if (item.value > 0) {
+      filteredActual.push(item)
+    }
+  }
+
+  return {
+    planned: filteredPlanned,
+    actual: filteredActual
+  }
+}
+
+export function getMonthlyEntriesList(financeData, monthKey) {
+  const result = []
+  const entryItems = getEntriesForMonthView(financeData.entries || [], monthKey)
+
+  for (const entry of entryItems) {
+    result.push({
+      ...entry,
+      sourceType: 'entry',
+      originalId: entry.id,
+      title: entry.category || 'Geral',
+      displayNote: entry.note || 'Sem observação',
+      displayAmount: Number(entry.visibleAmount || entry.amount || 0),
+      displayDate: entry.date,
+      entryKindLabel: entry.type === 'investment' ? 'Investimento' : 'Despesa variável',
+      recurrenceLabel: entry.isRecurring ? 'Recorrente' : 'Avulso'
+    })
+  }
+
+  for (const fixedCost of financeData.fixedCosts || []) {
+    if (!fixedCost.active) {
+      continue
+    }
+
+    if (hasSkippedMonth(fixedCost, monthKey)) {
+      continue
+    }
+
+    result.push({
+      id: `fixed-view-${fixedCost.id}-${monthKey}`,
+      originalId: fixedCost.id,
+      sourceType: 'fixed_cost',
+      title: fixedCost.title || fixedCost.category || 'Custo fixo',
+      category: fixedCost.category || 'Casa',
+      displayNote: 'Custo fixo recorrente',
+      displayAmount: Number(fixedCost.amount || 0),
+      displayDate: buildVirtualFixedCostDate(monthKey, fixedCost.dueDay),
+      dueDay: Number(fixedCost.dueDay || 1),
+      entryKindLabel: 'Custo fixo',
+      recurrenceLabel: 'Mensal'
+    })
+  }
+
+  result.sort((a, b) => {
+    if (a.displayDate < b.displayDate) return 1
+    if (a.displayDate > b.displayDate) return -1
+    return 0
+  })
+
+  return result
 }

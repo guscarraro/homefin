@@ -3,11 +3,11 @@ import EntriesList from '../components/entries/EntriesList'
 import { useFinance } from '../context/FinanceContext'
 
 function EntriesPage() {
-  const { financeData } = useFinance()
+  const { visibleEntries } = useFinance()
 
   return (
-    <AppShell title="Lançamentos">
-      <EntriesList entries={financeData.entries} />
+    <AppShell title="Lançamentos do mês">
+      <EntriesList entries={visibleEntries} />
     </AppShell>
   )
 }

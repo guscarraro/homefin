@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import styled from 'styled-components'
 import Card from '../common/Card'
 import ExpenseForm from './ExpenseForm'
+import FixedCostForm from './FixedCostForm'
 
 const Header = styled.div`
   display: flex;
@@ -18,18 +20,60 @@ const Subtitle = styled.p`
   line-height: 1.4;
 `
 
+const Switch = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  background: ${({ theme }) => theme.colors.surfaceAlt};
+  padding: 6px;
+  border-radius: 16px;
+  margin-bottom: 18px;
+`
+
+const SwitchButton = styled.button`
+  border: 0;
+  border-radius: 12px;
+  min-height: 42px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+  background: ${({ active, theme }) =>
+    active ? theme.colors.primary : 'transparent'};
+  color: ${({ active, theme }) =>
+    active ? '#fff' : theme.colors.text};
+`
+
 function QuickLaunch() {
+  const [mode, setMode] = useState('expense')
+
   return (
     <Card>
       <Header>
         <Title>Lançamento rápido</Title>
         <Subtitle>
-          Aqui é sem enrolação: valor, categoria, conta e pronto. Se parcelar, o app já joga isso
-          nas projeções dos próximos meses.
+          Um único bloco para manter o sistema prático. Aqui você escolhe se quer lançar despesa normal ou custo fixo, sem criar aba sobrando à toa.
         </Subtitle>
       </Header>
 
-      <ExpenseForm />
+      <Switch>
+        <SwitchButton
+          type="button"
+          active={mode === 'expense' ? 1 : 0}
+          onClick={() => setMode('expense')}
+        >
+          Despesa / investimento
+        </SwitchButton>
+
+        <SwitchButton
+          type="button"
+          active={mode === 'fixed' ? 1 : 0}
+          onClick={() => setMode('fixed')}
+        >
+          Custo fixo
+        </SwitchButton>
+      </Switch>
+
+      {mode === 'expense' ? <ExpenseForm /> : <FixedCostForm />}
     </Card>
   )
 }

@@ -2,12 +2,12 @@ import styled from 'styled-components'
 import {
   FiAlertTriangle,
   FiCalendar,
+  FiCoffee,
+  FiDollarSign,
   FiFlag,
   FiShield,
   FiTarget,
-  FiTrendingUp,
-  FiUtensils,
-  FiWallet
+  FiTrendingUp
 } from 'react-icons/fi'
 import Card from '../common/Card'
 
@@ -64,9 +64,11 @@ const Text = styled.p`
 `
 
 function getSuggestionIcon(icon) {
-  if (icon === 'wallet') return <FiWallet size={20} />
-  if (icon === 'food') return <FiUtensils size={20} />
-  if (icon === 'target') return <FiTrendingUp size={20} />
+  if (icon === 'wallet') return <FiDollarSign size={20} />
+  if (icon === 'food') return <FiCoffee size={20} />
+  if (icon === 'coffee') return <FiCoffee size={20} />
+  if (icon === 'target') return <FiTarget size={20} />
+  if (icon === 'trend') return <FiTrendingUp size={20} />
   if (icon === 'calendar') return <FiCalendar size={20} />
   if (icon === 'goal') return <FiFlag size={20} />
   if (icon === 'shield') return <FiShield size={20} />
@@ -75,9 +77,18 @@ function getSuggestionIcon(icon) {
 }
 
 function SuggestionsCard({ suggestions }) {
+  if (!suggestions.length) {
+    return (
+      <Card>
+        <h3>Sugestões e alertas</h3>
+        <p>Nenhuma sugestão disponível.</p>
+      </Card>
+    )
+  }
+
   return (
     <Card>
-      <h3 style={{ marginBottom: 14 }}>Sugestões e alertas</h3>
+      <h3>Sugestões e alertas do mês</h3>
 
       <List>
         {suggestions.map(item => (

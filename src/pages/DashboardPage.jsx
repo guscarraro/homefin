@@ -19,9 +19,9 @@ function DashboardPage() {
     <AppShell title="Resumo do mês">
       <Grid>
         <BalanceHero projection={projection} />
+        <SpendingDonut projection={projection} />
         <QuickLaunch />
         <SuggestionsCard suggestions={suggestions} />
-        <SpendingDonut data={categoryTotals} />
       </Grid>
     </AppShell>
   )

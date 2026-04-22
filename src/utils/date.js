@@ -1,41 +1,35 @@
-export function getCurrentMonthKey() {
-  const today = new Date()
-  const year = today.getFullYear()
-  const month = String(today.getMonth() + 1).padStart(2, '0')
+export function padMonth(value) {
+  return String(value).padStart(2, '0')
+}
+
+export function getMonthKeyFromDate(dateValue) {
+  const date = new Date(dateValue)
+  const year = date.getFullYear()
+  const month = padMonth(date.getMonth() + 1)
   return `${year}-${month}`
 }
 
-export function getMonthKeyFromDate(dateString) {
-  if (!dateString) {
-    return getCurrentMonthKey()
+export function addMonthsToMonthKey(monthKey, amount) {
+  const [yearString, monthString] = monthKey.split('-')
+  const date = new Date(Number(yearString), Number(monthString) - 1 + amount, 1)
+  return getMonthKeyFromDate(date)
+}
+
+export function getNextMonthKey(monthKey) {
+  return addMonthsToMonthKey(monthKey, 1)
+}
+
+export function getDaysInMonthFromKey(monthKey) {
+  const [yearString, monthString] = monthKey.split('-')
+  return new Date(Number(yearString), Number(monthString), 0).getDate()
+}
+
+export function getTodayDayOfMonth(monthKey) {
+  const currentMonth = getMonthKeyFromDate(new Date())
+
+  if (currentMonth !== monthKey) {
+    return 1
   }
 
-  return String(dateString).slice(0, 7)
-}
-
-export function addMonthsToMonthKey(monthKey, monthsToAdd) {
-  const [yearString, monthString] = monthKey.split('-')
-  const year = Number(yearString)
-  const month = Number(monthString) - 1
-
-  const date = new Date(year, month + monthsToAdd, 1)
-
-  const nextYear = date.getFullYear()
-  const nextMonth = String(date.getMonth() + 1).padStart(2, '0')
-
-  return `${nextYear}-${nextMonth}`
-}
-
-export function getRemainingDaysInMonth() {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = now.getMonth()
-  const lastDay = new Date(year, month + 1, 0).getDate()
-
-  return Math.max(lastDay - now.getDate(), 1)
-}
-
-export function getRemainingWeeksInMonth() {
-  const remainingDays = getRemainingDaysInMonth()
-  return Math.max(Math.ceil(remainingDays / 7), 1)
+  return new Date().getDate()
 }

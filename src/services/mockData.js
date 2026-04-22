@@ -17,6 +17,7 @@ export const CATEGORIES = [
   'Pets',
   'Saúde',
   'Compras',
+  'Investimento',
   'Outros'
 ]
 

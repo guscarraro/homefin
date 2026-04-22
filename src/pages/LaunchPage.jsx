@@ -1,10 +1,10 @@
 import AppShell from '../components/layout/AppShell'
-import QuickLaunch from '../components/launch/QuickLaunch'
+import QuickLaunchFixed from '../components/launch/QuickLaunchFixed'
 
 function LaunchPage() {
   return (
     <AppShell title="Lançar agora">
-      <QuickLaunch />
+      <QuickLaunchFixed />
     </AppShell>
   )
 }

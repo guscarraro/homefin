@@ -34,6 +34,12 @@ const Hint = styled.div`
   line-height: 1.4;
 `
 
+function getSelectValue(value) {
+  if (value?.target) return value.target.value
+  if (value?.value) return value.value
+  return value || ''
+}
+
 function ExpenseForm() {
   const { addEntry } = useFinance()
   const { selectedUser } = useUser()
@@ -52,7 +58,28 @@ function ExpenseForm() {
     const parsedAmount = Number(String(amount).replace(',', '.'))
     const parsedInstallments = Number(installmentCount || 1)
 
-    if (!parsedAmount || !category || !account || !paymentMethod) {
+    if (!parsedAmount) {
+      alert('Informe um valor válido')
+      return
+    }
+
+    if (!category) {
+      alert('Selecione a categoria')
+      return
+    }
+
+    if (!account) {
+      alert('Selecione a conta')
+      return
+    }
+
+    if (!paymentMethod) {
+      alert('Selecione a forma de pagamento')
+      return
+    }
+
+    if (isInstallment && parsedInstallments < 2) {
+      alert('Se foi parcelado, informe ao menos 2 parcelas')
       return
     }
 
@@ -80,70 +107,74 @@ function ExpenseForm() {
   return (
     <Form onSubmit={handleSubmit}>
       <Input
-        placeholder="Valor da compra"
+        placeholder="Valor da compra ou aporte"
         inputMode="decimal"
         value={amount}
-        onChange={event => setAmount(event.target.value)}
+        onChange={e => setAmount(e.target.value)}
       />
 
       <StyledSelect
         options={CATEGORIES}
         value={category}
-        onChange={event => setCategory(event.target.value)}
+        onChange={v => setCategory(getSelectValue(v))}
         placeholder="Categoria"
       />
 
       <StyledSelect
         options={ACCOUNTS}
         value={account}
-        onChange={event => setAccount(event.target.value)}
+        onChange={v => setAccount(getSelectValue(v))}
         placeholder="Conta / banco"
       />
 
       <StyledSelect
         options={PAYMENT_METHODS}
         value={paymentMethod}
-        onChange={event => setPaymentMethod(event.target.value)}
+        onChange={v => setPaymentMethod(getSelectValue(v))}
         placeholder="Forma de pagamento"
       />
 
-      <ToggleBox>
-        <input
-          type="checkbox"
-          checked={isInstallment}
-          onChange={event => setIsInstallment(event.target.checked)}
-        />
-        <span>Foi parcelado?</span>
-      </ToggleBox>
+      {category !== 'Investimento' && (
+        <ToggleBox>
+          <input
+            type="checkbox"
+            checked={isInstallment}
+            onChange={e => setIsInstallment(e.target.checked)}
+          />
+          <span>Foi parcelado?</span>
+        </ToggleBox>
+      )}
 
-      {isInstallment && (
+      {isInstallment && category !== 'Investimento' && (
         <>
           <Input
             placeholder="Quantas parcelas?"
             inputMode="numeric"
             value={installmentCount}
-            onChange={event => setInstallmentCount(event.target.value)}
+            onChange={e => setInstallmentCount(e.target.value)}
           />
 
           {paymentMethod === 'Crédito' ? (
-            <Hint>
-              Como foi no crédito, a primeira parcela entra no mês que vem.
-            </Hint>
+            <Hint>Primeira parcela entra no mês que vem.</Hint>
           ) : (
-            <Hint>
-              Como não foi no crédito, a primeira parcela já entra no mês atual.
-            </Hint>
+            <Hint>Primeira parcela entra no mês atual.</Hint>
           )}
         </>
       )}
 
+      {category === 'Investimento' && (
+        <Hint>
+          Lançando em “Investimento”, o valor entra como aporte real do mês e passa a abater da meta mínima.
+        </Hint>
+      )}
+
       <Input
-        placeholder="Observação opcional"
+        placeholder="Observação"
         value={note}
-        onChange={event => setNote(event.target.value)}
+        onChange={e => setNote(e.target.value)}
       />
 
-      <Button type="submit">Salvar despesa</Button>
+      <Button type="submit">Salvar lançamento</Button>
     </Form>
   )
 }
