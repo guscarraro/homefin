@@ -4,14 +4,14 @@ export async function getSalaries(req, res) {
   const { data, error } = await supabase
     .from('salaries')
     .select('*')
-    .eq('user_id', req.user.id)
+    .eq('household_id', req.user.householdId)
     .order('month', { ascending: false })
 
   if (error) {
     return res.status(500).json({ error: 'Erro ao buscar salários' })
   }
 
-  res.json(data || [])
+  return res.json(data || [])
 }
 
 export async function saveSalary(req, res) {
@@ -19,6 +19,7 @@ export async function saveSalary(req, res) {
 
   const payload = {
     user_id: req.user.id,
+    household_id: req.user.householdId,
     month,
     gustavo: Number(gustavo || 0),
     marccella: Number(marccella || 0),
@@ -27,12 +28,12 @@ export async function saveSalary(req, res) {
 
   const { data, error } = await supabase
     .from('salaries')
-    .upsert(payload, { onConflict: 'user_id,month' })
+    .upsert(payload, { onConflict: 'household_id,month' })
     .select()
 
   if (error) {
-    return res.status(500).json({ error: 'Erro ao salvar salário' })
+    return res.status(500).json({ error: 'Erro ao salvar salário', details: error.message })
   }
 
-  res.json(data[0])
+  return res.json(data[0])
 }

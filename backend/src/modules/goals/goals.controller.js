@@ -4,11 +4,10 @@ export async function getGoals(req, res) {
   const { data, error } = await supabase
     .from('goals')
     .select('*')
-    .eq('user_id', req.user.id)
+    .eq('household_id', req.user.householdId)
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('Erro ao buscar metas:', error)
     return res.status(500).json({ error: 'Erro ao buscar metas' })
   }
 
@@ -22,6 +21,7 @@ export async function getGoals(req, res) {
       targetMonths: Number(item.target_months || 0),
       priority: item.priority,
       userId: item.user_id,
+      householdId: item.household_id,
       createdAt: item.created_at
     })
   }
@@ -32,6 +32,7 @@ export async function getGoals(req, res) {
 export async function createGoal(req, res) {
   const payload = {
     user_id: req.user.id,
+    household_id: req.user.householdId,
     title: req.body.title,
     target_amount: Number(req.body.targetAmount || 0),
     target_months: Number(req.body.targetMonths || 0),
@@ -44,7 +45,6 @@ export async function createGoal(req, res) {
     .select()
 
   if (error) {
-    console.error('Erro ao criar meta:', error)
     return res.status(500).json({ error: 'Erro ao criar meta', details: error.message })
   }
 
@@ -57,6 +57,7 @@ export async function createGoal(req, res) {
     targetMonths: Number(item.target_months || 0),
     priority: item.priority,
     userId: item.user_id,
+    householdId: item.household_id,
     createdAt: item.created_at
   })
 }
@@ -68,10 +69,9 @@ export async function deleteGoal(req, res) {
     .from('goals')
     .delete()
     .eq('id', id)
-    .eq('user_id', req.user.id)
+    .eq('household_id', req.user.householdId)
 
   if (error) {
-    console.error('Erro ao excluir meta:', error)
     return res.status(500).json({ error: 'Erro ao excluir meta' })
   }
 

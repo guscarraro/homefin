@@ -1,8 +1,19 @@
-import { Router } from 'express'
-import { login } from './auth.controller.js'
+import jwt from 'jsonwebtoken'
 
-const router = Router()
+export function auth(req, res, next) {
+  const authHeader = req.headers.authorization
 
-router.post('/login', login)
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Token não informado' })
+  }
 
-export default router
+  const [, token] = authHeader.split(' ')
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET)
+    req.user = decoded
+    return next()
+  } catch {
+    return res.status(401).json({ error: 'Token inválido' })
+  }
+}

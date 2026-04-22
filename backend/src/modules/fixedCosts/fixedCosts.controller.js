@@ -4,6 +4,7 @@ function normalizeFixedCost(item) {
   return {
     id: item.id,
     userId: item.user_id,
+    householdId: item.household_id,
     title: item.title,
     amount: Number(item.amount || 0),
     dueDay: Number(item.due_day || 1),
@@ -17,16 +18,14 @@ export async function getFixedCosts(req, res) {
   const { data, error } = await supabase
     .from('fixed_costs')
     .select('*')
-    .eq('user_id', req.user.id)
+    .eq('household_id', req.user.householdId)
     .order('due_day', { ascending: true })
 
   if (error) {
-    console.error('Erro ao buscar custos fixos:', error)
     return res.status(500).json({ error: 'Erro ao buscar custos fixos' })
   }
 
   const normalized = []
-
   for (const item of data || []) {
     normalized.push(normalizeFixedCost(item))
   }
@@ -37,6 +36,7 @@ export async function getFixedCosts(req, res) {
 export async function createFixedCost(req, res) {
   const payload = {
     user_id: req.user.id,
+    household_id: req.user.householdId,
     title: req.body.title,
     amount: Number(req.body.amount || 0),
     due_day: Number(req.body.dueDay || 1),
@@ -50,7 +50,6 @@ export async function createFixedCost(req, res) {
     .select()
 
   if (error) {
-    console.error('Erro ao criar custo fixo:', error)
     return res.status(500).json({ error: 'Erro ao criar custo fixo', details: error.message })
   }
 
@@ -80,11 +79,10 @@ export async function updateFixedCost(req, res) {
     .from('fixed_costs')
     .update(cleanPayload)
     .eq('id', id)
-    .eq('user_id', req.user.id)
+    .eq('household_id', req.user.householdId)
     .select()
 
   if (error) {
-    console.error('Erro ao atualizar custo fixo:', error)
     return res.status(500).json({ error: 'Erro ao atualizar custo fixo', details: error.message })
   }
 
@@ -98,10 +96,9 @@ export async function deleteFixedCost(req, res) {
     .from('fixed_costs')
     .delete()
     .eq('id', id)
-    .eq('user_id', req.user.id)
+    .eq('household_id', req.user.householdId)
 
   if (error) {
-    console.error('Erro ao excluir custo fixo:', error)
     return res.status(500).json({ error: 'Erro ao excluir custo fixo' })
   }
 

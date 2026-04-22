@@ -4,6 +4,7 @@ function normalizeEntry(item) {
   return {
     id: item.id,
     userId: item.user_id,
+    householdId: item.household_id,
     type: item.type,
     category: item.category,
     amount: Number(item.amount || 0),
@@ -23,12 +24,12 @@ function normalizeEntry(item) {
 
 export async function getEntries(req, res) {
   const { month } = req.query
-  const userId = req.user.id
+  const householdId = req.user.householdId
 
   let query = supabase
     .from('entries')
     .select('*')
-    .eq('user_id', userId)
+    .eq('household_id', householdId)
     .order('date', { ascending: false })
 
   if (month) {
@@ -40,12 +41,10 @@ export async function getEntries(req, res) {
   const { data, error } = await query
 
   if (error) {
-    console.error('Erro ao buscar lançamentos:', error)
     return res.status(500).json({ error: 'Erro ao buscar lançamentos' })
   }
 
   const normalized = []
-
   for (const item of data || []) {
     normalized.push(normalizeEntry(item))
   }
@@ -54,10 +53,9 @@ export async function getEntries(req, res) {
 }
 
 export async function createEntry(req, res) {
-  const userId = req.user.id
-
   const payload = {
-    user_id: userId,
+    user_id: req.user.id,
+    household_id: req.user.householdId,
     type: req.body.type || 'expense',
     category: req.body.category,
     amount: Number(req.body.amount || 0),
@@ -79,7 +77,6 @@ export async function createEntry(req, res) {
     .select()
 
   if (error) {
-    console.error('Erro ao criar lançamento:', error)
     return res.status(500).json({ error: 'Erro ao criar lançamento', details: error.message })
   }
 
@@ -117,11 +114,10 @@ export async function updateEntry(req, res) {
     .from('entries')
     .update(cleanPayload)
     .eq('id', id)
-    .eq('user_id', req.user.id)
+    .eq('household_id', req.user.householdId)
     .select()
 
   if (error) {
-    console.error('Erro ao atualizar lançamento:', error)
     return res.status(500).json({ error: 'Erro ao atualizar lançamento' })
   }
 
@@ -135,10 +131,9 @@ export async function deleteEntry(req, res) {
     .from('entries')
     .delete()
     .eq('id', id)
-    .eq('user_id', req.user.id)
+    .eq('household_id', req.user.householdId)
 
   if (error) {
-    console.error('Erro ao excluir lançamento:', error)
     return res.status(500).json({ error: 'Erro ao excluir lançamento' })
   }
 
