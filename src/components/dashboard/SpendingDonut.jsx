@@ -204,29 +204,32 @@ const StatValue = styled.div`
   font-weight: 700;
 `
 
-const COLORS = {
-  investment: { planned: '#6d28d9', actual: '#a78bfa' },
-  goals: { planned: '#0f766e', actual: '#5eead4' },
-  fixed: { planned: '#1d4ed8', actual: '#60a5fa' },
-  market: { planned: '#15803d', actual: '#4ade80' },
-  food: { planned: '#c2410c', actual: '#fb923c' },
-  leisure: { planned: '#be123c', actual: '#fb7185' },
-  transport: { planned: '#a16207', actual: '#facc15' },
-  other: { planned: '#374151', actual: '#9ca3af' }
+const CATEGORY_COLORS = {
+  Mercado: { planned: '#15803d', actual: '#4ade80' },
+  Alimentação: { planned: '#c2410c', actual: '#fb923c' },
+  Combustível: { planned: '#a16207', actual: '#facc15' },
+  Casa: { planned: '#1d4ed8', actual: '#60a5fa' },
+  Farmácia: { planned: '#0f766e', actual: '#5eead4' },
+  Lazer: { planned: '#be123c', actual: '#fb7185' },
+  Assinaturas: { planned: '#7c3aed', actual: '#a78bfa' },
+  Transporte: { planned: '#a16207', actual: '#facc15' },
+  Pets: { planned: '#9333ea', actual: '#c084fc' },
+  Saúde: { planned: '#0891b2', actual: '#67e8f9' },
+  Compras: { planned: '#ea580c', actual: '#fdba74' },
+  Outros: { planned: '#374151', actual: '#9ca3af' },
+  Investimento: { planned: '#6d28d9', actual: '#a78bfa' },
+  Metas: { planned: '#0f766e', actual: '#5eead4' },
+  'Custos fixos': { planned: '#1d4ed8', actual: '#60a5fa' }
 }
 
 function getCategoryVisual(name) {
-  const normalized = String(name || '').toLowerCase()
+  const visual = CATEGORY_COLORS[name]
 
-  if (normalized.includes('invest')) return { key: 'investment', ...COLORS.investment }
-  if (normalized.includes('meta')) return { key: 'goals', ...COLORS.goals }
-  if (normalized.includes('fix')) return { key: 'fixed', ...COLORS.fixed }
-  if (normalized.includes('mercado')) return { key: 'market', ...COLORS.market }
-  if (normalized.includes('alimenta')) return { key: 'food', ...COLORS.food }
-  if (normalized.includes('lazer')) return { key: 'leisure', ...COLORS.leisure }
-  if (normalized.includes('transporte')) return { key: 'transport', ...COLORS.transport }
+  if (visual) {
+    return visual
+  }
 
-  return { key: 'other', ...COLORS.other }
+  return CATEGORY_COLORS.Outros
 }
 
 function getTotal(data) {
@@ -248,105 +251,99 @@ function getPercent(value, total) {
 }
 
 function buildComparableData(projection) {
-  const plannedBase = [
-    {
-      name: 'Investimento',
-      helper: 'Meta ideal',
-      value: Number((projection.aggressiveInvestment || projection.investmentSuggested || 0).toFixed(2))
-    },
-    {
-      name: 'Metas',
-      helper: 'Reserva mensal',
-      value: Number(projection.monthlyGoalsNeed.toFixed(2))
-    },
-    {
-      name: 'Custos fixos',
-      helper: 'Compromisso fixo',
-      value: Number(projection.fixedCosts.toFixed(2))
-    },
-    {
-      name: 'Mercado',
-      helper: 'Teto saudável',
-      value: Number(projection.marketBudget.toFixed(2))
-    },
-    {
-      name: 'Alimentação',
-      helper: 'Teto saudável',
-      value: Number(projection.foodBudget.toFixed(2))
-    },
-    {
-      name: 'Lazer',
-      helper: 'Teto saudável',
-      value: Number(projection.leisureBudget.toFixed(2))
-    },
-    {
-      name: 'Transporte',
-      helper: 'Teto saudável',
-      value: Number(projection.transportBudget.toFixed(2))
-    },
-    {
-      name: 'Outros',
-      helper: 'Margem prevista',
-      value: Number(projection.otherBudget.toFixed(2))
-    }
-  ]
-
-  const actualBase = [
-    {
-      name: 'Investimento',
-      helper: 'Realizado',
-      value: Number(projection.investments.toFixed(2))
-    },
-    {
-      name: 'Metas',
-      helper: 'Pago de verdade',
-      value: Number((projection.goalPayments || 0).toFixed(2))
-    },
-    {
-      name: 'Custos fixos',
-      helper: 'Realizado',
-      value: Number(projection.fixedCosts.toFixed(2))
-    },
-    {
-      name: 'Mercado',
-      helper: 'Gasto atual',
-      value: Number(projection.marketSpent.toFixed(2))
-    },
-    {
-      name: 'Alimentação',
-      helper: 'Gasto atual',
-      value: Number(projection.foodSpent.toFixed(2))
-    },
-    {
-      name: 'Lazer',
-      helper: 'Gasto atual',
-      value: Number(projection.leisureSpent.toFixed(2))
-    },
-    {
-      name: 'Transporte',
-      helper: 'Gasto atual',
-      value: Number(projection.transportSpent.toFixed(2))
-    },
-    {
-      name: 'Outros',
-      helper: 'Gasto atual',
-      value: Number(projection.otherSpent.toFixed(2))
-    }
-  ]
-
   const planned = []
   const actual = []
 
-  for (const item of plannedBase) {
-    if (item.value <= 0) continue
+  for (const item of projection.categoryPlans || []) {
     const visual = getCategoryVisual(item.name)
-    planned.push({ ...item, fill: visual.planned, compareKey: visual.key })
+
+    if (item.planned > 0) {
+      planned.push({
+        name: item.name,
+        helper: `${item.percent}% previsto`,
+        value: Number(item.planned.toFixed(2)),
+        fill: visual.planned,
+        compareKey: item.name
+      })
+    }
+
+    if (item.spent > 0) {
+      actual.push({
+        name: item.name,
+        helper: 'Gasto atual',
+        value: Number(item.spent.toFixed(2)),
+        fill: visual.actual,
+        compareKey: item.name
+      })
+    }
   }
 
-  for (const item of actualBase) {
-    if (item.value <= 0) continue
-    const visual = getCategoryVisual(item.name)
-    actual.push({ ...item, fill: visual.actual, compareKey: visual.key })
+  if (projection.fixedCosts > 0) {
+    const visual = getCategoryVisual('Custos fixos')
+
+    planned.push({
+      name: 'Custos fixos',
+      helper: 'Compromisso fixo',
+      value: Number(projection.fixedCosts.toFixed(2)),
+      fill: visual.planned,
+      compareKey: 'Custos fixos'
+    })
+
+    actual.push({
+      name: 'Custos fixos',
+      helper: 'Realizado',
+      value: Number(projection.fixedCosts.toFixed(2)),
+      fill: visual.actual,
+      compareKey: 'Custos fixos'
+    })
+  }
+
+  if (projection.aggressiveInvestment > 0 || projection.investmentSuggested > 0) {
+    const visual = getCategoryVisual('Investimento')
+
+    planned.push({
+      name: 'Investimento',
+      helper: 'Meta ideal',
+      value: Number((projection.aggressiveInvestment || projection.investmentSuggested || 0).toFixed(2)),
+      fill: visual.planned,
+      compareKey: 'Investimento'
+    })
+  }
+
+  if (projection.investments > 0) {
+    const visual = getCategoryVisual('Investimento')
+
+    actual.push({
+      name: 'Investimento',
+      helper: 'Realizado',
+      value: Number(projection.investments.toFixed(2)),
+      fill: visual.actual,
+      compareKey: 'Investimento'
+    })
+  }
+
+  if (projection.monthlyGoalsNeed > 0) {
+    const visual = getCategoryVisual('Metas')
+
+    planned.push({
+      name: 'Metas',
+      helper: 'Reserva mensal',
+      value: Number(projection.monthlyGoalsNeed.toFixed(2)),
+      fill: visual.planned,
+      compareKey: 'Metas'
+    })
+  }
+
+  if (projection.goalPayments > 0) {
+    const visual = getCategoryVisual('Metas')
+
+    actual.push({
+      name: 'Metas',
+      helper: 'Pago de verdade',
+      value: Number(projection.goalPayments.toFixed(2)),
+      fill: visual.actual,
+      compareKey: 'Metas'
+    })
   }
 
   return { planned, actual }
@@ -518,7 +515,7 @@ function SpendingDonut({ projection }) {
       <Header>
         <h3>Planejado x real do mês</h3>
         <Subtitle>
-          O anel interno mostra o plano do mês e o externo mostra apenas o que já foi pago ou gasto de verdade.
+          Agora o plano considera todas as categorias do app. O anel interno mostra o previsto e o externo mostra o que já foi gasto de verdade.
         </Subtitle>
       </Header>
 

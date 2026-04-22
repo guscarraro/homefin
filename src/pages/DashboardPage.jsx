@@ -13,10 +13,14 @@ const Grid = styled.div`
 `
 
 function DashboardPage() {
-  const { projection } = useFinance()
+  const { projection, selectedMonth } = useFinance()
 
   return (
-    <AppShell title="Resumo do mês">
+    <AppShell
+      title="Resumo do mês"
+      subtitle={`Analisando ${selectedMonth}`}
+      showMonthSelector
+    >
       <Grid>
         <QuickLaunch />
         <BalanceHero projection={projection} />

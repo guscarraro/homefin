@@ -6,6 +6,47 @@ import {
   getDaysInMonthFromKey,
   padMonth
 } from './date'
+import { CATEGORIES } from '../services/mockData'
+
+const CATEGORY_PLAN_RULES = {
+  Mercado: { percent: 0.1, tone: 'market' },
+  Alimentação: { percent: 0.05, tone: 'food' },
+  Combustível: { percent: 0.04, tone: 'transport' },
+  Casa: { percent: 0.04, tone: 'house' },
+  Farmácia: { percent: 0.02, tone: 'health' },
+  Lazer: { percent: 0.06, tone: 'leisure' },
+  Assinaturas: { percent: 0.015, tone: 'subscription' },
+  Transporte: { percent: 0.04, tone: 'transport' },
+  Pets: { percent: 0.025, tone: 'pets' },
+  Saúde: { percent: 0.03, tone: 'health' },
+  Compras: { percent: 0.03, tone: 'shopping' },
+  Outros: { percent: 0.03, tone: 'other' }
+}
+
+function getWeekInfo(monthKey) {
+  const now = new Date()
+  const currentMonthKey = getMonthKeyFromDate(now)
+
+  if (monthKey !== currentMonthKey) {
+    return {
+      daysLeftInWeek: 7,
+      daysLeftInMonth: getDaysInMonthFromKey(monthKey)
+    }
+  }
+
+  const dayOfWeek = now.getDay()
+  const normalizedDay = dayOfWeek === 0 ? 7 : dayOfWeek
+  const daysLeftInWeek = Math.max(1, 7 - normalizedDay + 1)
+
+  const daysInMonth = getDaysInMonthFromKey(monthKey)
+  const todayDay = getTodayDayOfMonth(monthKey)
+  const daysLeftInMonth = Math.max(1, daysInMonth - todayDay + 1)
+
+  return {
+    daysLeftInWeek,
+    daysLeftInMonth
+  }
+}
 
 function getSalaryForMonth(salaries, monthKey) {
   let total = 0
@@ -190,10 +231,10 @@ function getTotals(entriesForMonth, fixedCosts, monthKey) {
   }
 }
 
-function getCategorySpent(entriesForMonth, categories) {
+function getCategorySpent(entriesForMonth) {
   const totals = {}
 
-  for (const category of categories) {
+  for (const category of CATEGORIES) {
     totals[category] = 0
   }
 
@@ -221,72 +262,64 @@ function clampBudget(value, minValue, maxValue) {
   return value
 }
 
-function buildLifestyleBudgets(salary, availableAfterGoals) {
-  if (salary <= 0 || availableAfterGoals <= 0) {
-    return {
-      marketBudget: 0,
-      foodBudget: 0,
-      leisureBudget: 0,
-      transportBudget: 0,
-      otherBudget: 0
+function buildAllCategoryBudgets(salary, availableAfterGoals) {
+  const categoriesToPlan = []
+
+  for (const category of CATEGORIES) {
+    if (category === 'Investimento' || category === 'Meta') {
+      continue
     }
+
+    categoriesToPlan.push(category)
   }
 
-  const marketBase = salary * 0.1
-  const foodBase = salary * 0.05
-  const leisureBase = salary * 0.06
-  const transportBase = salary * 0.08
-  const otherBase = salary * 0.04
+  if (salary <= 0 || availableAfterGoals <= 0) {
+    const emptyPlans = []
 
-  const totalBase =
-    marketBase +
-    foodBase +
-    leisureBase +
-    transportBase +
-    otherBase
+    for (const category of categoriesToPlan) {
+      emptyPlans.push({
+        name: category,
+        planned: 0,
+        spent: 0,
+        remaining: 0,
+        percent: Number(((CATEGORY_PLAN_RULES[category]?.percent || 0) * 100).toFixed(1)),
+        tone: CATEGORY_PLAN_RULES[category]?.tone || 'other'
+      })
+    }
 
-  const pressureFactor =
-    totalBase > 0
-      ? Math.min(1, availableAfterGoals / totalBase)
-      : 1
-
-  const marketBudget = clampBudget(
-    Number((marketBase * pressureFactor).toFixed(2)),
-    0,
-    Number((salary * 0.12).toFixed(2))
-  )
-
-  const foodBudget = clampBudget(
-    Number((foodBase * pressureFactor).toFixed(2)),
-    0,
-    Number((salary * 0.06).toFixed(2))
-  )
-
-  const leisureBudget = clampBudget(
-    Number((leisureBase * pressureFactor).toFixed(2)),
-    0,
-    Number((salary * 0.08).toFixed(2))
-  )
-
-  const transportBudget = clampBudget(
-    Number((transportBase * pressureFactor).toFixed(2)),
-    0,
-    Number((salary * 0.1).toFixed(2))
-  )
-
-  const otherBudget = clampBudget(
-    Number((otherBase * pressureFactor).toFixed(2)),
-    0,
-    Number((salary * 0.05).toFixed(2))
-  )
-
-  return {
-    marketBudget,
-    foodBudget,
-    leisureBudget,
-    transportBudget,
-    otherBudget
+    return emptyPlans
   }
+
+  let baseTotal = 0
+
+  for (const category of categoriesToPlan) {
+    const rule = CATEGORY_PLAN_RULES[category]
+    baseTotal += salary * Number(rule?.percent || 0)
+  }
+
+  const pressureFactor = baseTotal > 0
+    ? Math.min(1, availableAfterGoals / baseTotal)
+    : 1
+
+  const plans = []
+
+  for (const category of categoriesToPlan) {
+    const rule = CATEGORY_PLAN_RULES[category]
+    const percent = Number(rule?.percent || 0)
+    const rawBudget = salary * percent * pressureFactor
+    const maxBudget = salary * percent * 1.15
+
+    plans.push({
+      name: category,
+      planned: clampBudget(Number(rawBudget.toFixed(2)), 0, Number(maxBudget.toFixed(2))),
+      spent: 0,
+      remaining: 0,
+      percent: Number((percent * 100).toFixed(1)),
+      tone: rule?.tone || 'other'
+    })
+  }
+
+  return plans
 }
 
 function getSuggestedInvestment(salary, fixedCosts, variableExpenses) {
@@ -359,24 +392,44 @@ export function buildMonthlyProjection(financeData, monthKey) {
   const availableToSpend = Number((salary - totals.expenses - totals.investments).toFixed(2))
   const availableAfterGoals = Number((availableToSpend - monthlyGoalsNeed).toFixed(2))
 
-  const daysInMonth = getDaysInMonthFromKey(monthKey)
-  const todayDay = getTodayDayOfMonth(monthKey)
-  const remainingDays = Math.max(1, daysInMonth - todayDay + 1)
-
+  const weekInfo = getWeekInfo(monthKey)
   const weeklyBudget = availableAfterGoals > 0 ? Number((availableAfterGoals / 4).toFixed(2)) : 0
-  const dailyLimit = availableAfterGoals > 0 ? Number((availableAfterGoals / remainingDays).toFixed(2)) : 0
+  const dailyLimit = availableAfterGoals > 0
+    ? Number((availableAfterGoals / weekInfo.daysLeftInMonth).toFixed(2))
+    : 0
 
-  const lifestyleBudgets = buildLifestyleBudgets(salary, availableAfterGoals)
+  const categorySpent = getCategorySpent(entriesForMonth)
+  const categoryPlans = buildAllCategoryBudgets(salary, availableAfterGoals)
 
-  const categorySpent = getCategorySpent(entriesForMonth, [
-    'Mercado',
-    'Alimentação',
-    'Lazer',
-    'Transporte',
-    'Combustível',
-    'Outros',
-    'Compras'
-  ])
+  for (const plan of categoryPlans) {
+    const spent = Number(categorySpent[plan.name] || 0)
+    plan.spent = Number(spent.toFixed(2))
+    plan.remaining = Math.max(0, Number((plan.planned - plan.spent).toFixed(2)))
+  }
+
+  let marketSpent = 0
+  let foodSpent = 0
+  let leisureSpent = 0
+  let transportSpent = 0
+  let otherSpent = 0
+
+  for (const plan of categoryPlans) {
+    if (plan.name === 'Mercado') {
+      marketSpent = plan.spent
+    } else if (plan.name === 'Alimentação') {
+      foodSpent = plan.spent
+    } else if (plan.name === 'Lazer') {
+      leisureSpent = plan.spent
+    } else if (plan.name === 'Transporte' || plan.name === 'Combustível') {
+      transportSpent += plan.spent
+    } else if (
+      plan.name !== 'Mercado' &&
+      plan.name !== 'Alimentação' &&
+      plan.name !== 'Lazer'
+    ) {
+      otherSpent += plan.spent
+    }
+  }
 
   const nextMonthKey = getNextMonthKey(monthKey)
   const nextMonthEntries = getEntriesForMonthView(financeData.entries, nextMonthKey)
@@ -424,20 +477,35 @@ export function buildMonthlyProjection(financeData, monthKey) {
     availableAfterGoals,
     weeklyBudget,
     dailyLimit,
-    marketBudget: lifestyleBudgets.marketBudget,
-    foodBudget: lifestyleBudgets.foodBudget,
-    leisureBudget: lifestyleBudgets.leisureBudget,
-    transportBudget: lifestyleBudgets.transportBudget,
-    otherBudget: lifestyleBudgets.otherBudget,
-    marketSpent: Number((categorySpent.Mercado || 0).toFixed(2)),
-    foodSpent: Number((categorySpent.Alimentação || 0).toFixed(2)),
-    leisureSpent: Number((categorySpent.Lazer || 0).toFixed(2)),
-    transportSpent: Number(
-      (((categorySpent.Transporte || 0) + (categorySpent.Combustível || 0))).toFixed(2)
+    daysLeftInWeek: weekInfo.daysLeftInWeek,
+    daysLeftInMonth: weekInfo.daysLeftInMonth,
+    categoryPlans,
+    marketBudget: Number((categoryPlans.find(item => item.name === 'Mercado')?.planned || 0).toFixed(2)),
+    foodBudget: Number((categoryPlans.find(item => item.name === 'Alimentação')?.planned || 0).toFixed(2)),
+    leisureBudget: Number((categoryPlans.find(item => item.name === 'Lazer')?.planned || 0).toFixed(2)),
+    transportBudget: Number(
+      (
+        (categoryPlans.find(item => item.name === 'Transporte')?.planned || 0) +
+        (categoryPlans.find(item => item.name === 'Combustível')?.planned || 0)
+      ).toFixed(2)
     ),
-    otherSpent: Number(
-      (((categorySpent.Outros || 0) + (categorySpent.Compras || 0))).toFixed(2)
+    otherBudget: Number(
+      categoryPlans
+        .filter(item =>
+          item.name !== 'Mercado' &&
+          item.name !== 'Alimentação' &&
+          item.name !== 'Lazer' &&
+          item.name !== 'Transporte' &&
+          item.name !== 'Combustível'
+        )
+        .reduce((total, item) => total + item.planned, 0)
+        .toFixed(2)
     ),
+    marketSpent: Number(marketSpent.toFixed(2)),
+    foodSpent: Number(foodSpent.toFixed(2)),
+    leisureSpent: Number(leisureSpent.toFixed(2)),
+    transportSpent: Number(transportSpent.toFixed(2)),
+    otherSpent: Number(otherSpent.toFixed(2)),
     nextMonthCommitted: Number(nextMonthCommitted.toFixed(2)),
     nextMonthInstallments: Number(nextMonthInstallments.toFixed(2))
   }
@@ -472,19 +540,6 @@ export function buildSuggestions(projection, goals) {
         currency: 'BRL'
       })}.`
     })
-
-    if (projection.investedAboveMinimum > 0) {
-      items.push({
-        id: 'investment-above-minimum',
-        tone: 'success',
-        icon: 'target',
-        title: 'Investimento acima do mínimo',
-        text: `Além do piso, ainda foi colocado ${projection.investedAboveMinimum.toLocaleString('pt-BR', {
-          style: 'currency',
-          currency: 'BRL'
-        })} acima da meta mínima.`
-      })
-    }
   } else {
     items.push({
       id: 'investment-missing',
@@ -622,94 +677,68 @@ export function simulateGoal(goal, projection) {
 }
 
 export function getProjectionDonutData(projection) {
-  const planned = [
-    {
-      name: 'Custos fixos',
-      value: Number(projection.fixedCosts.toFixed(2))
-    },
-    {
-      name: 'Investimento ideal',
-      value: Number((projection.aggressiveInvestment || projection.investmentSuggested || 0).toFixed(2))
-    },
-    {
-      name: 'Metas mensais',
-      value: Number(projection.monthlyGoalsNeed.toFixed(2))
-    },
-    {
-      name: 'Mercado',
-      value: Number(projection.marketBudget.toFixed(2))
-    },
-    {
-      name: 'Alimentação',
-      value: Number(projection.foodBudget.toFixed(2))
-    },
-    {
-      name: 'Lazer',
-      value: Number(projection.leisureBudget.toFixed(2))
-    },
-    {
-      name: 'Transporte',
-      value: Number(projection.transportBudget.toFixed(2))
-    },
-    {
-      name: 'Outros',
-      value: Number(projection.otherBudget.toFixed(2))
+  const planned = []
+  const actual = []
+
+  for (const item of projection.categoryPlans || []) {
+    if (item.planned > 0) {
+      planned.push({
+        name: item.name,
+        value: Number(item.planned.toFixed(2))
+      })
     }
-  ]
 
-  const actual = [
-    {
-      name: 'Custos fixos',
-      value: Number(projection.fixedCosts.toFixed(2))
-    },
-    {
-      name: 'Investimentos',
-      value: Number(projection.investments.toFixed(2))
-    },
-    {
-      name: 'Metas',
-      value: Number(projection.goalPayments.toFixed(2))
-    },
-    {
-      name: 'Mercado',
-      value: Number(projection.marketSpent.toFixed(2))
-    },
-    {
-      name: 'Alimentação',
-      value: Number(projection.foodSpent.toFixed(2))
-    },
-    {
-      name: 'Lazer',
-      value: Number(projection.leisureSpent.toFixed(2))
-    },
-    {
-      name: 'Transporte',
-      value: Number(projection.transportSpent.toFixed(2))
-    },
-    {
-      name: 'Outros',
-      value: Number(projection.otherSpent.toFixed(2))
-    }
-  ]
-
-  const filteredPlanned = []
-  const filteredActual = []
-
-  for (const item of planned) {
-    if (item.value > 0) {
-      filteredPlanned.push(item)
+    if (item.spent > 0) {
+      actual.push({
+        name: item.name,
+        value: Number(item.spent.toFixed(2))
+      })
     }
   }
 
-  for (const item of actual) {
-    if (item.value > 0) {
-      filteredActual.push(item)
-    }
+  if (projection.fixedCosts > 0) {
+    planned.push({
+      name: 'Custos fixos',
+      value: Number(projection.fixedCosts.toFixed(2))
+    })
+
+    actual.push({
+      name: 'Custos fixos',
+      value: Number(projection.fixedCosts.toFixed(2))
+    })
+  }
+
+  if (projection.aggressiveInvestment > 0 || projection.investmentSuggested > 0) {
+    planned.push({
+      name: 'Investimento',
+      value: Number((projection.aggressiveInvestment || projection.investmentSuggested || 0).toFixed(2))
+    })
+  }
+
+  if (projection.investments > 0) {
+    actual.push({
+      name: 'Investimento',
+      value: Number(projection.investments.toFixed(2))
+    })
+  }
+
+  if (projection.monthlyGoalsNeed > 0) {
+    planned.push({
+      name: 'Metas',
+      value: Number(projection.monthlyGoalsNeed.toFixed(2))
+    })
+  }
+
+  if (projection.goalPayments > 0) {
+    actual.push({
+      name: 'Metas',
+      value: Number(projection.goalPayments.toFixed(2))
+    })
   }
 
   return {
-    planned: filteredPlanned,
-    actual: filteredActual
+    planned,
+    actual
   }
 }
 

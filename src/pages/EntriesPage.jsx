@@ -3,10 +3,14 @@ import EntriesList from '../components/entries/EntriesList'
 import { useFinance } from '../context/FinanceContext'
 
 function EntriesPage() {
-  const { visibleEntries } = useFinance()
+  const { visibleEntries, selectedMonth } = useFinance()
 
   return (
-    <AppShell title="Lançamentos do mês">
+    <AppShell
+      title="Lançamentos do mês"
+      subtitle={`Analisando ${selectedMonth}`}
+      showMonthSelector
+    >
       <EntriesList entries={visibleEntries} />
     </AppShell>
   )

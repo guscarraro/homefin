@@ -5,9 +5,15 @@ import {
   FiCoffee,
   FiDollarSign,
   FiFlag,
+  FiHeart,
+  FiHome,
+  FiPackage,
+  FiRepeat,
   FiShield,
+  FiShoppingBag,
   FiTarget,
-  FiTrendingUp
+  FiTrendingUp,
+  FiTruck
 } from 'react-icons/fi'
 import Card from '../common/Card'
 import { formatCurrency } from '../../utils/currency'
@@ -75,6 +81,12 @@ function getSuggestionIcon(icon) {
   if (icon === 'goal') return <FiFlag size={20} />
   if (icon === 'shield') return <FiShield size={20} />
   if (icon === 'danger') return <FiAlertTriangle size={20} />
+  if (icon === 'health') return <FiHeart size={20} />
+  if (icon === 'home') return <FiHome size={20} />
+  if (icon === 'subscription') return <FiRepeat size={20} />
+  if (icon === 'pets') return <FiPackage size={20} />
+  if (icon === 'shopping') return <FiShoppingBag size={20} />
+  if (icon === 'transport') return <FiTruck size={20} />
   return <FiTarget size={20} />
 }
 
@@ -133,6 +145,51 @@ function getToneColors(tone) {
     }
   }
 
+  if (tone === 'health') {
+    return {
+      color: '#0891b2',
+      background: 'rgba(34, 211, 238, 0.10)',
+      iconBackground: 'rgba(34, 211, 238, 0.18)',
+      iconColor: '#67e8f9'
+    }
+  }
+
+  if (tone === 'house') {
+    return {
+      color: '#2563eb',
+      background: 'rgba(59, 130, 246, 0.10)',
+      iconBackground: 'rgba(59, 130, 246, 0.18)',
+      iconColor: '#93c5fd'
+    }
+  }
+
+  if (tone === 'subscription') {
+    return {
+      color: '#7c3aed',
+      background: 'rgba(167, 139, 250, 0.10)',
+      iconBackground: 'rgba(167, 139, 250, 0.18)',
+      iconColor: '#c4b5fd'
+    }
+  }
+
+  if (tone === 'pets') {
+    return {
+      color: '#9333ea',
+      background: 'rgba(192, 132, 252, 0.10)',
+      iconBackground: 'rgba(192, 132, 252, 0.18)',
+      iconColor: '#d8b4fe'
+    }
+  }
+
+  if (tone === 'shopping') {
+    return {
+      color: '#ea580c',
+      background: 'rgba(251, 146, 60, 0.10)',
+      iconBackground: 'rgba(251, 146, 60, 0.18)',
+      iconColor: '#fdba74'
+    }
+  }
+
   if (tone === 'danger') {
     return {
       color: '#ef4444',
@@ -150,6 +207,37 @@ function getToneColors(tone) {
   }
 }
 
+function getToneIcon(tone) {
+  if (tone === 'market') return 'food'
+  if (tone === 'food') return 'coffee'
+  if (tone === 'leisure') return 'trend'
+  if (tone === 'transport') return 'transport'
+  if (tone === 'investment') return 'shield'
+  if (tone === 'goal') return 'goal'
+  if (tone === 'health') return 'health'
+  if (tone === 'house') return 'home'
+  if (tone === 'subscription') return 'subscription'
+  if (tone === 'pets') return 'pets'
+  if (tone === 'shopping') return 'shopping'
+  if (tone === 'danger') return 'danger'
+  return 'calendar'
+}
+
+function getWeeklyAllowedAmount(categoryPlan, projection) {
+  const daysLeftInMonth = Math.max(1, Number(projection.daysLeftInMonth || 1))
+  const daysLeftInWeek = Math.max(1, Number(projection.daysLeftInWeek || 1))
+  const remaining = Math.max(0, Number(categoryPlan.remaining || 0))
+
+  return Number(((remaining / daysLeftInMonth) * daysLeftInWeek).toFixed(2))
+}
+
+function getDailyAllowedAmount(categoryPlan, projection) {
+  const daysLeftInWeek = Math.max(1, Number(projection.daysLeftInWeek || 1))
+  const weeklyAllowed = getWeeklyAllowedAmount(categoryPlan, projection)
+
+  return Number((weeklyAllowed / daysLeftInWeek).toFixed(2))
+}
+
 function SuggestionsCard({ projection }) {
   if (!projection?.hasSalary) {
     return (
@@ -163,47 +251,38 @@ function SuggestionsCard({ projection }) {
   const weekItems = [
     {
       id: 'week-budget',
-      title: 'Teto da semana',
-      text: `Até o fim desta semana, o ideal é não passar de ${formatCurrency(projection.weeklyBudget)}.`,
+      title: 'Quanto ainda pode gastar nesta semana',
+      text: `Faltam ${projection.daysLeftInWeek} dia(s) para fechar a semana. O ideal é não passar de ${formatCurrency(projection.weeklyBudget)} nesse período.`,
       icon: 'calendar',
       tone: 'default'
     },
     {
       id: 'day-budget',
-      title: 'Teto por dia',
-      text: `A régua diária atual está em ${formatCurrency(projection.dailyLimit)}.`,
+      title: 'Quanto isso representa por dia até o fim do mês',
+      text: `Faltam ${projection.daysLeftInMonth} dia(s) para acabar o mês. Sua régua diária geral está em ${formatCurrency(projection.dailyLimit)} por dia.`,
       icon: 'calendar',
       tone: 'default'
-    },
-    {
-      id: 'market',
-      title: 'Mercado',
-      text: `Planejado: ${formatCurrency(projection.marketBudget)} • Gasto atual: ${formatCurrency(projection.marketSpent)}.`,
-      icon: 'food',
-      tone: 'market'
-    },
-    {
-      id: 'food',
-      title: 'Alimentação',
-      text: `Planejado: ${formatCurrency(projection.foodBudget)} • Gasto atual: ${formatCurrency(projection.foodSpent)}.`,
-      icon: 'coffee',
-      tone: 'food'
-    },
-    {
-      id: 'leisure',
-      title: 'Lazer',
-      text: `Planejado: ${formatCurrency(projection.leisureBudget)} • Gasto atual: ${formatCurrency(projection.leisureSpent)}.`,
-      icon: 'trend',
-      tone: 'leisure'
-    },
-    {
-      id: 'transport',
-      title: 'Transporte',
-      text: `Planejado: ${formatCurrency(projection.transportBudget)} • Gasto atual: ${formatCurrency(projection.transportSpent)}.`,
-      icon: 'calendar',
-      tone: 'transport'
     }
   ]
+
+  const weeklyCategoryItems = []
+
+  for (const item of projection.categoryPlans || []) {
+    const weeklyAllowed = getWeeklyAllowedAmount(item, projection)
+    const dailyAllowed = getDailyAllowedAmount(item, projection)
+    const isOverBudget = item.spent > item.planned && item.planned > 0
+    const tone = isOverBudget ? 'danger' : item.tone || 'default'
+
+    weeklyCategoryItems.push({
+      id: `week-category-${item.name}`,
+      title: `${item.name} nesta semana`,
+      text: isOverBudget
+        ? `Essa categoria já passou do planejado do mês. O ideal agora é travar novos gastos nela até o próximo fechamento.`
+        : `Até o fim desta semana, ainda dá para usar ${formatCurrency(weeklyAllowed)} nessa categoria. Isso representa cerca de ${formatCurrency(dailyAllowed)} por dia.`,
+      icon: getToneIcon(item.tone),
+      tone
+    })
+  }
 
   const monthItems = [
     {
@@ -216,7 +295,7 @@ function SuggestionsCard({ projection }) {
     {
       id: 'goals',
       title: 'Reserva mensal das metas',
-      text: `O ideal do mês para objetivos é ${formatCurrency(projection.monthlyGoalsNeed)}.`,
+      text: `O ideal do mês para objetivos é ${formatCurrency(projection.monthlyGoalsNeed)} e o que já foi pago de verdade nelas foi ${formatCurrency(projection.goalPayments)}.`,
       icon: 'goal',
       tone: 'goal'
     },
@@ -235,6 +314,21 @@ function SuggestionsCard({ projection }) {
       tone: projection.nextMonthCommitted > 0 ? 'danger' : 'default'
     }
   ]
+
+  const categoryItems = []
+
+  for (const item of projection.categoryPlans || []) {
+    const isOverBudget = item.spent > item.planned && item.planned > 0
+    const tone = isOverBudget ? 'danger' : item.tone || 'default'
+
+    categoryItems.push({
+      id: `category-${item.name}`,
+      title: item.name,
+      text: `Previsto: ${item.percent}% do salário • Planejado: ${formatCurrency(item.planned)} • Gasto atual: ${formatCurrency(item.spent)} • Ainda pode gastar no mês: ${formatCurrency(item.remaining)}.`,
+      icon: getToneIcon(item.tone),
+      tone
+    })
+  }
 
   return (
     <Card>
@@ -271,10 +365,70 @@ function SuggestionsCard({ projection }) {
       </Section>
 
       <Section>
+        <SectionTitle>Quanto ainda pode gastar por categoria nesta semana</SectionTitle>
+
+        <List>
+          {weeklyCategoryItems.map(item => {
+            const colors = getToneColors(item.tone)
+
+            return (
+              <Item
+                key={item.id}
+                color={colors.color}
+                background={colors.background}
+              >
+                <IconBox
+                  iconBackground={colors.iconBackground}
+                  iconColor={colors.iconColor}
+                >
+                  {getSuggestionIcon(item.icon)}
+                </IconBox>
+
+                <div>
+                  <Title>{item.title}</Title>
+                  <Text>{item.text}</Text>
+                </div>
+              </Item>
+            )
+          })}
+        </List>
+      </Section>
+
+      <Section>
         <SectionTitle>Visão do mês</SectionTitle>
 
         <List>
           {monthItems.map(item => {
+            const colors = getToneColors(item.tone)
+
+            return (
+              <Item
+                key={item.id}
+                color={colors.color}
+                background={colors.background}
+              >
+                <IconBox
+                  iconBackground={colors.iconBackground}
+                  iconColor={colors.iconColor}
+                >
+                  {getSuggestionIcon(item.icon)}
+                </IconBox>
+
+                <div>
+                  <Title>{item.title}</Title>
+                  <Text>{item.text}</Text>
+                </div>
+              </Item>
+            )
+          })}
+        </List>
+      </Section>
+
+      <Section>
+        <SectionTitle>Categorias do mês</SectionTitle>
+
+        <List>
+          {categoryItems.map(item => {
             const colors = getToneColors(item.tone)
 
             return (
