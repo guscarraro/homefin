@@ -351,28 +351,67 @@ function buildComparableData(projection) {
 
 function buildLegendRows(planned, actual, salary) {
   const rows = []
+  const plannedMap = {}
   const actualMap = {}
+  const allKeys = []
+
+  for (const item of planned) {
+    plannedMap[item.compareKey] = item
+
+    let exists = false
+    for (const key of allKeys) {
+      if (key === item.compareKey) {
+        exists = true
+      }
+    }
+
+    if (!exists) {
+      allKeys.push(item.compareKey)
+    }
+  }
 
   for (const item of actual) {
     actualMap[item.compareKey] = item
+
+    let exists = false
+    for (const key of allKeys) {
+      if (key === item.compareKey) {
+        exists = true
+      }
+    }
+
+    if (!exists) {
+      allKeys.push(item.compareKey)
+    }
   }
 
-  for (const item of planned) {
-    const currentActual = actualMap[item.compareKey]
-    const actualValue = currentActual ? currentActual.value : 0
+  for (const compareKey of allKeys) {
+    const plannedItem = plannedMap[compareKey]
+    const actualItem = actualMap[compareKey]
+
+    const plannedValue = plannedItem ? plannedItem.value : 0
+    const actualValue = actualItem ? actualItem.value : 0
+    const exceededAmount = Math.max(0, Number((actualValue - plannedValue).toFixed(2)))
+    const exceededPercent = plannedValue > 0
+      ? Number((((actualValue - plannedValue) / plannedValue) * 100).toFixed(1))
+      : (actualValue > 0 ? 100 : 0)
 
     rows.push({
-      compareKey: item.compareKey,
-      name: item.name,
-      plannedColor: item.fill,
-      actualColor: currentActual ? currentActual.fill : item.fill,
-      plannedValue: item.value,
+      compareKey,
+      name: plannedItem?.name || actualItem?.name || compareKey,
+      plannedColor: plannedItem?.fill || actualItem?.fill || '#9ca3af',
+      actualColor: actualItem?.fill || plannedItem?.fill || '#9ca3af',
+      plannedValue,
       actualValue,
-      plannedHelper: item.helper,
-      actualHelper: currentActual ? currentActual.helper : 'Sem gasto',
-      salaryPercentPlanned: getPercent(item.value, salary),
+      plannedHelper: plannedItem?.helper || 'Sem teto previsto',
+      actualHelper: actualItem?.helper || 'Sem gasto',
+      salaryPercentPlanned: getPercent(plannedValue, salary),
       salaryPercentActual: getPercent(actualValue, salary),
-      categoryProgress: item.value > 0 ? Number(((actualValue / item.value) * 100).toFixed(1)) : 0
+      categoryProgress: plannedValue > 0 ? Number(((actualValue / plannedValue) * 100).toFixed(1)) : 0,
+      exceededAmount,
+      exceededPercent,
+      isOverBudget: actualValue > plannedValue,
+      hasPlannedBudget: plannedValue > 0
     })
   }
 
@@ -449,7 +488,7 @@ function SpendingDonut({ projection }) {
   const plannedTotal = getTotal(planned)
   const actualTotal = getTotal(actual)
   const plannedUnallocated = Math.max(0, Number((projection.salary - plannedTotal).toFixed(2)))
-  const actualRemaining = Math.max(0, Number((projection.availableAfterGoals).toFixed(2)))
+  const actualRemaining = Number(projection.availableAfterGoals.toFixed(2))
 
   const legendRows = useMemo(
     () => buildLegendRows(planned, actual, projection.salary),
@@ -473,10 +512,19 @@ function SpendingDonut({ projection }) {
 
   const centerTitle = selectedRow ? selectedRow.name : 'Comparativo'
   const centerValue = selectedRow
-    ? `${selectedRow.categoryProgress}%`
+    ? selectedRow.hasPlannedBudget
+      ? `${selectedRow.categoryProgress}%`
+      : selectedRow.isOverBudget
+        ? 'Sem teto'
+        : '0%'
     : `${getPercent(actualTotal, projection.salary)}%`
+
   const centerSubValue = selectedRow
-    ? `${formatCurrency(selectedRow.actualValue)} de ${formatCurrency(selectedRow.plannedValue)}`
+    ? selectedRow.hasPlannedBudget
+      ? selectedRow.isOverBudget
+        ? `${formatCurrency(selectedRow.exceededAmount)} acima`
+        : `${formatCurrency(selectedRow.actualValue)} de ${formatCurrency(selectedRow.plannedValue)}`
+      : `${formatCurrency(selectedRow.actualValue)} sem previsão`
     : `${formatCurrency(actualTotal)} realizado`
 
   function handleSelect(compareKey) {
@@ -515,7 +563,7 @@ function SpendingDonut({ projection }) {
       <Header>
         <h3>Planejado x real do mês</h3>
         <Subtitle>
-          Agora o plano considera todas as categorias do app. O anel interno mostra o previsto e o externo mostra o que já foi gasto de verdade.
+          Agora o plano considera todas as categorias do app. O anel interno mostra o previsto e o externo mostra o que já foi gasto de verdade, inclusive quando você passa do teto.
         </Subtitle>
       </Header>
 
@@ -605,7 +653,9 @@ function SpendingDonut({ projection }) {
                 </LegendValueRow>
 
                 <LegendMeta>
-                  {item.plannedHelper} • {item.salaryPercentPlanned}% do salário
+                  {item.hasPlannedBudget
+                    ? `${item.plannedHelper} • ${item.salaryPercentPlanned}% do salário`
+                    : 'Sem teto previsto para esta categoria neste mês'}
                 </LegendMeta>
               </LegendItem>
             ))}
@@ -635,7 +685,11 @@ function SpendingDonut({ projection }) {
                 </LegendValueRow>
 
                 <LegendMeta>
-                  {item.actualHelper} • {item.salaryPercentActual}% do salário • {item.categoryProgress}% do planejado
+                  {item.isOverBudget
+                    ? item.hasPlannedBudget
+                      ? `${item.actualHelper} • ${item.salaryPercentActual}% do salário • extrapolou ${item.exceededPercent}% (${formatCurrency(item.exceededAmount)} acima)`
+                      : `${item.actualHelper} • ${item.salaryPercentActual}% do salário • gasto sem previsão`
+                    : `${item.actualHelper} • ${item.salaryPercentActual}% do salário • ${item.categoryProgress}% do planejado`}
                 </LegendMeta>
               </LegendItem>
             ))}

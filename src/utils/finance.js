@@ -262,7 +262,7 @@ function clampBudget(value, minValue, maxValue) {
   return value
 }
 
-function buildAllCategoryBudgets(salary, availableAfterGoals) {
+function buildAllCategoryBudgets(salary) {
   const categoriesToPlan = []
 
   for (const category of CATEGORIES) {
@@ -273,45 +273,15 @@ function buildAllCategoryBudgets(salary, availableAfterGoals) {
     categoriesToPlan.push(category)
   }
 
-  if (salary <= 0 || availableAfterGoals <= 0) {
-    const emptyPlans = []
-
-    for (const category of categoriesToPlan) {
-      emptyPlans.push({
-        name: category,
-        planned: 0,
-        spent: 0,
-        remaining: 0,
-        percent: Number(((CATEGORY_PLAN_RULES[category]?.percent || 0) * 100).toFixed(1)),
-        tone: CATEGORY_PLAN_RULES[category]?.tone || 'other'
-      })
-    }
-
-    return emptyPlans
-  }
-
-  let baseTotal = 0
-
-  for (const category of categoriesToPlan) {
-    const rule = CATEGORY_PLAN_RULES[category]
-    baseTotal += salary * Number(rule?.percent || 0)
-  }
-
-  const pressureFactor = baseTotal > 0
-    ? Math.min(1, availableAfterGoals / baseTotal)
-    : 1
-
   const plans = []
 
   for (const category of categoriesToPlan) {
     const rule = CATEGORY_PLAN_RULES[category]
     const percent = Number(rule?.percent || 0)
-    const rawBudget = salary * percent * pressureFactor
-    const maxBudget = salary * percent * 1.15
 
     plans.push({
       name: category,
-      planned: clampBudget(Number(rawBudget.toFixed(2)), 0, Number(maxBudget.toFixed(2))),
+      planned: salary > 0 ? Number((salary * percent).toFixed(2)) : 0,
       spent: 0,
       remaining: 0,
       percent: Number((percent * 100).toFixed(1)),

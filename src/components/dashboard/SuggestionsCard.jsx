@@ -238,6 +238,18 @@ function getDailyAllowedAmount(categoryPlan, projection) {
   return Number((weeklyAllowed / daysLeftInWeek).toFixed(2))
 }
 
+function getExceededAmount(item) {
+  return Math.max(0, Number((item.spent - item.planned).toFixed(2)))
+}
+
+function getExceededPercent(item) {
+  if (item.planned <= 0) {
+    return item.spent > 0 ? 100 : 0
+  }
+
+  return Number((((item.spent - item.planned) / item.planned) * 100).toFixed(1))
+}
+
 function SuggestionsCard({ projection }) {
   if (!projection?.hasSalary) {
     return (
@@ -270,15 +282,20 @@ function SuggestionsCard({ projection }) {
   for (const item of projection.categoryPlans || []) {
     const weeklyAllowed = getWeeklyAllowedAmount(item, projection)
     const dailyAllowed = getDailyAllowedAmount(item, projection)
+    const exceededAmount = getExceededAmount(item)
+    const exceededPercent = getExceededPercent(item)
     const isOverBudget = item.spent > item.planned && item.planned > 0
-    const tone = isOverBudget ? 'danger' : item.tone || 'default'
+    const isSpentWithoutBudget = item.spent > 0 && item.planned <= 0
+    const tone = isOverBudget || isSpentWithoutBudget ? 'danger' : item.tone || 'default'
 
     weeklyCategoryItems.push({
       id: `week-category-${item.name}`,
       title: `${item.name} nesta semana`,
       text: isOverBudget
-        ? `Essa categoria já passou do planejado do mês. O ideal agora é travar novos gastos nela até o próximo fechamento.`
-        : `Até o fim desta semana, ainda dá para usar ${formatCurrency(weeklyAllowed)} nessa categoria. Isso representa cerca de ${formatCurrency(dailyAllowed)} por dia.`,
+        ? `Você já passou ${formatCurrency(exceededAmount)} do teto mensal dessa categoria, ou ${exceededPercent}% acima do planejado. Nesta semana, o melhor movimento é zerar novos gastos nela.`
+        : isSpentWithoutBudget
+          ? `Essa categoria não tinha teto previsto neste mês, mas já consumiu ${formatCurrency(item.spent)}. Nesta semana, trate isso como gasto fora da curva e evite repetir.`
+          : `Até o fim desta semana, ainda dá para usar ${formatCurrency(weeklyAllowed)} nessa categoria. Isso representa cerca de ${formatCurrency(dailyAllowed)} por dia.`,
       icon: getToneIcon(item.tone),
       tone
     })
@@ -318,13 +335,20 @@ function SuggestionsCard({ projection }) {
   const categoryItems = []
 
   for (const item of projection.categoryPlans || []) {
+    const exceededAmount = getExceededAmount(item)
+    const exceededPercent = getExceededPercent(item)
     const isOverBudget = item.spent > item.planned && item.planned > 0
-    const tone = isOverBudget ? 'danger' : item.tone || 'default'
+    const isSpentWithoutBudget = item.spent > 0 && item.planned <= 0
+    const tone = isOverBudget || isSpentWithoutBudget ? 'danger' : item.tone || 'default'
 
     categoryItems.push({
       id: `category-${item.name}`,
       title: item.name,
-      text: `Previsto: ${item.percent}% do salário • Planejado: ${formatCurrency(item.planned)} • Gasto atual: ${formatCurrency(item.spent)} • Ainda pode gastar no mês: ${formatCurrency(item.remaining)}.`,
+      text: isOverBudget
+        ? `Previsto: ${item.percent}% do salário • Planejado: ${formatCurrency(item.planned)} • Gasto atual: ${formatCurrency(item.spent)} • Você estourou ${formatCurrency(exceededAmount)}, ou ${exceededPercent}% acima do teto.`
+        : isSpentWithoutBudget
+          ? `Essa categoria ficou sem orçamento planejado neste mês, mas já consumiu ${formatCurrency(item.spent)}.`
+          : `Previsto: ${item.percent}% do salário • Planejado: ${formatCurrency(item.planned)} • Gasto atual: ${formatCurrency(item.spent)} • Ainda pode gastar no mês: ${formatCurrency(item.remaining)}.`,
       icon: getToneIcon(item.tone),
       tone
     })
