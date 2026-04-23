@@ -9,18 +9,18 @@ import {
 import { CATEGORIES } from '../services/mockData'
 
 const CATEGORY_PLAN_RULES = {
-  Mercado: { percent: 0.1, tone: 'market' },
-  Alimentação: { percent: 0.05, tone: 'food' },
-  Combustível: { percent: 0.04, tone: 'transport' },
-  Casa: { percent: 0.04, tone: 'house' },
-  Farmácia: { percent: 0.02, tone: 'health' },
-  Lazer: { percent: 0.06, tone: 'leisure' },
-  Assinaturas: { percent: 0.015, tone: 'subscription' },
-  Transporte: { percent: 0.04, tone: 'transport' },
+  Mercado: { percent: 0.07, tone: 'market' },
+  Alimentação: { percent: 0.04, tone: 'food' },
+  Combustível: { percent: 0.025, tone: 'transport' },
+  Casa: { percent: 0.08, tone: 'house' },
+  Farmácia: { percent: 0.015, tone: 'health' },
+  Lazer: { percent: 0.04, tone: 'leisure' },
+  Assinaturas: { percent: 0.01, tone: 'subscription' },
+  Transporte: { percent: 0.095, tone: 'transport' },
   Pets: { percent: 0.025, tone: 'pets' },
-  Saúde: { percent: 0.03, tone: 'health' },
-  Compras: { percent: 0.03, tone: 'shopping' },
-  Outros: { percent: 0.03, tone: 'other' }
+  Saúde: { percent: 0.04, tone: 'health' },
+  Compras: { percent: 0.015, tone: 'shopping' },
+  Outros: { percent: 0.02, tone: 'other' }
 }
 
 function getWeekInfo(monthKey) {
@@ -256,12 +256,6 @@ function getCategorySpent(entriesForMonth) {
   return totals
 }
 
-function clampBudget(value, minValue, maxValue) {
-  if (value < minValue) return minValue
-  if (value > maxValue) return maxValue
-  return value
-}
-
 function buildAllCategoryBudgets(salary) {
   const categoriesToPlan = []
 
@@ -369,7 +363,7 @@ export function buildMonthlyProjection(financeData, monthKey) {
     : 0
 
   const categorySpent = getCategorySpent(entriesForMonth)
-  const categoryPlans = buildAllCategoryBudgets(salary, availableAfterGoals)
+  const categoryPlans = buildAllCategoryBudgets(salary)
 
   for (const plan of categoryPlans) {
     const spent = Number(categorySpent[plan.name] || 0)
@@ -428,6 +422,20 @@ export function buildMonthlyProjection(financeData, monthKey) {
     Number((investmentActual - investmentSuggested).toFixed(2))
   )
 
+  let otherBudgetAccumulator = 0
+
+  for (const item of categoryPlans) {
+    if (
+      item.name !== 'Mercado' &&
+      item.name !== 'Alimentação' &&
+      item.name !== 'Lazer' &&
+      item.name !== 'Transporte' &&
+      item.name !== 'Combustível'
+    ) {
+      otherBudgetAccumulator += item.planned
+    }
+  }
+
   return {
     month: monthKey,
     hasSalary: salary > 0,
@@ -459,18 +467,7 @@ export function buildMonthlyProjection(financeData, monthKey) {
         (categoryPlans.find(item => item.name === 'Combustível')?.planned || 0)
       ).toFixed(2)
     ),
-    otherBudget: Number(
-      categoryPlans
-        .filter(item =>
-          item.name !== 'Mercado' &&
-          item.name !== 'Alimentação' &&
-          item.name !== 'Lazer' &&
-          item.name !== 'Transporte' &&
-          item.name !== 'Combustível'
-        )
-        .reduce((total, item) => total + item.planned, 0)
-        .toFixed(2)
-    ),
+    otherBudget: Number(otherBudgetAccumulator.toFixed(2)),
     marketSpent: Number(marketSpent.toFixed(2)),
     foodSpent: Number(foodSpent.toFixed(2)),
     leisureSpent: Number(leisureSpent.toFixed(2)),
@@ -510,6 +507,19 @@ export function buildSuggestions(projection, goals) {
         currency: 'BRL'
       })}.`
     })
+
+    if (projection.investedAboveMinimum > 0) {
+      items.push({
+        id: 'investment-above-minimum',
+        tone: 'success',
+        icon: 'target',
+        title: 'Investimento acima do mínimo',
+        text: `Além do piso, ainda foi colocado ${projection.investedAboveMinimum.toLocaleString('pt-BR', {
+          style: 'currency',
+          currency: 'BRL'
+        })} acima da meta mínima.`
+      })
+    }
   } else {
     items.push({
       id: 'investment-missing',
