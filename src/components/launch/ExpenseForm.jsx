@@ -49,6 +49,15 @@ const Hint = styled.div`
   line-height: 1.45;
 `
 
+const Feedback = styled.div`
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(239, 68, 68, 0.10);
+  color: ${({ theme }) => theme.colors.danger};
+  font-size: 14px;
+  line-height: 1.45;
+`
+
 function getSelectValue(value) {
   if (value?.target) return value.target.value
   if (value?.value) return value.value
@@ -67,44 +76,47 @@ function ExpenseForm() {
   const [isInstallment, setIsInstallment] = useState(false)
   const [installmentCount, setInstallmentCount] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const isInvestment = category === 'Investimento'
+  const isIncome = category === 'Receita'
   const isGoalPayment = category === 'Meta'
-  const allowInstallment = !isInvestment && !isGoalPayment
+  const allowInstallment = !isIncome && !isInvestment && !isGoalPayment
 
   async function handleSubmit(event) {
     event.preventDefault()
 
     const parsedAmount = Number(String(amount).replace(',', '.'))
     const parsedInstallments = Number(installmentCount || 1)
+    setError('')
 
     if (!parsedAmount) {
-      alert('Informe um valor válido')
+      setError('Informe um valor válido.')
       return
     }
 
     if (!category) {
-      alert('Selecione a categoria')
+      setError('Selecione a categoria.')
       return
     }
 
     if (!account) {
-      alert('Selecione a conta')
+      setError('Selecione a conta.')
       return
     }
 
     if (!paymentMethod) {
-      alert('Selecione a forma de pagamento')
+      setError('Selecione a forma de pagamento.')
       return
     }
 
     if (isGoalPayment && !goalId) {
-      alert('Selecione qual meta recebeu esse valor')
+      setError('Selecione qual meta recebeu esse valor.')
       return
     }
 
     if (allowInstallment && isInstallment && parsedInstallments < 2) {
-      alert('Se foi parcelado, informe ao menos 2 parcelas')
+      setError('Se foi parcelado, informe ao menos 2 parcelas.')
       return
     }
 
@@ -113,6 +125,7 @@ function ExpenseForm() {
 
       await addEntry({
         amount: parsedAmount,
+        type: isIncome ? 'income' : isInvestment ? 'investment' : 'expense',
         category,
         account,
         paymentMethod,
@@ -131,6 +144,8 @@ function ExpenseForm() {
       setGoalId('')
       setIsInstallment(false)
       setInstallmentCount('')
+    } catch (err) {
+      setError(err.message || 'Não foi possível salvar o lançamento.')
     } finally {
       setLoading(false)
     }
@@ -211,13 +226,13 @@ function ExpenseForm() {
 
       {isInvestment && (
         <Hint>
-          Lançando em “Investimento”, o valor entra como aporte real do mês e ajuda a bater a meta mínima de investimento.
+          Lançando em "Investimento", o valor entra como aporte real do mês e ajuda a bater a meta mínima de investimento.
         </Hint>
       )}
 
       {isGoalPayment && (
         <Hint>
-          Lançando em “Meta”, o sistema entende que esse dinheiro saiu da conta e foi destinado a um objetivo específico.
+          Lançando em "Meta", o sistema entende que esse dinheiro saiu da conta e foi destinado a um objetivo específico.
         </Hint>
       )}
 
@@ -226,6 +241,8 @@ function ExpenseForm() {
         value={note}
         onChange={event => setNote(event.target.value)}
       />
+
+      {error ? <Feedback>{error}</Feedback> : null}
 
       <Button type="submit" disabled={loading}>
         {loading ? 'Salvando...' : 'Salvar lançamento'}

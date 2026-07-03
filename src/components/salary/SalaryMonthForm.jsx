@@ -11,6 +11,15 @@ const Form = styled.form`
   gap: 12px;
 `;
 
+const Feedback = styled.div`
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(239, 68, 68, 0.10);
+  color: ${({ theme }) => theme.colors.danger};
+  font-size: 14px;
+  line-height: 1.45;
+`;
+
 function SalaryMonthForm() {
   const { saveMonthSalary } = useFinance();
 
@@ -18,15 +27,17 @@ function SalaryMonthForm() {
   const [gustavo, setGustavo] = useState("");
   const [marccella, setMarccella] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   async function handleSubmit(event) {
     event.preventDefault();
 
     const gustavoValue = Number(String(gustavo || 0).replace(",", "."));
     const marccellaValue = Number(String(marccella || 0).replace(",", "."));
+    setError("");
 
     if (!gustavoValue && !marccellaValue) {
-      alert("Informe pelo menos um salário");
+      setError("Informe pelo menos um salário.");
       return;
     }
 
@@ -41,6 +52,8 @@ function SalaryMonthForm() {
 
       setGustavo("");
       setMarccella("");
+    } catch (err) {
+      setError(err.message || "Não foi possível salvar os salários.");
     } finally {
       setLoading(false);
     }
@@ -70,6 +83,8 @@ function SalaryMonthForm() {
           value={marccella}
           onChange={(event) => setMarccella(event.target.value)}
         />
+
+        {error ? <Feedback>{error}</Feedback> : null}
 
         <Button type="submit" disabled={loading}>
           {loading ? "Salvando..." : "Salvar salários"}

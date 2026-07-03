@@ -3,56 +3,77 @@ const API = import.meta.env.VITE_API_URL
 function getHeaders() {
   const token = localStorage.getItem('token')
 
-  return {
+  const headers = {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${token}`
   }
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+
+  return headers
+}
+
+async function request(path, options = {}) {
+  if (!API) {
+    throw new Error('URL da API não configurada.')
+  }
+
+  const res = await fetch(`${API}${path}`, options)
+
+  if (res.status === 401) {
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+  }
+
+  if (res.status === 204) {
+    return null
+  }
+
+  const data = await res.json().catch(() => null)
+
+  if (!res.ok) {
+    throw new Error(data?.error || 'Não foi possível concluir a ação.')
+  }
+
+  return data
 }
 
 /* AUTH */
 export async function login(email, password) {
-  const res = await fetch(`${API}/auth/login`, {
+  return request('/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password })
   })
-
-  return res.json()
 }
 
 /* ENTRIES */
 export async function getEntries(month) {
-  const url = month ? `${API}/entries?month=${month}` : `${API}/entries`
-
-  const res = await fetch(url, {
+  const url = month ? `/entries?month=${month}` : '/entries'
+  return request(url, {
     headers: getHeaders()
   })
-
-  return res.json()
 }
 
 export async function createEntry(data) {
-  const res = await fetch(`${API}/entries`, {
+  return request('/entries', {
     method: 'POST',
     headers: getHeaders(),
     body: JSON.stringify(data)
   })
-
-  return res.json()
 }
 
 export async function updateEntry(id, data) {
-  const res = await fetch(`${API}/entries/${id}`, {
+  return request(`/entries/${id}`, {
     method: 'PUT',
     headers: getHeaders(),
     body: JSON.stringify(data)
   })
-
-  return res.json()
 }
 
 export async function deleteEntry(id) {
-  await fetch(`${API}/entries/${id}`, {
+  return request(`/entries/${id}`, {
     method: 'DELETE',
     headers: getHeaders()
   })
@@ -60,35 +81,29 @@ export async function deleteEntry(id) {
 
 /* FIXED COSTS */
 export async function getFixedCosts() {
-  const res = await fetch(`${API}/fixed-costs`, {
+  return request('/fixed-costs', {
     headers: getHeaders()
   })
-
-  return res.json()
 }
 
 export async function createFixedCost(data) {
-  const res = await fetch(`${API}/fixed-costs`, {
+  return request('/fixed-costs', {
     method: 'POST',
     headers: getHeaders(),
     body: JSON.stringify(data)
   })
-
-  return res.json()
 }
 
 export async function updateFixedCost(id, data) {
-  const res = await fetch(`${API}/fixed-costs/${id}`, {
+  return request(`/fixed-costs/${id}`, {
     method: 'PUT',
     headers: getHeaders(),
     body: JSON.stringify(data)
   })
-
-  return res.json()
 }
 
 export async function deleteFixedCost(id) {
-  await fetch(`${API}/fixed-costs/${id}`, {
+  return request(`/fixed-costs/${id}`, {
     method: 'DELETE',
     headers: getHeaders()
   })
@@ -96,25 +111,21 @@ export async function deleteFixedCost(id) {
 
 /* GOALS */
 export async function getGoals() {
-  const res = await fetch(`${API}/goals`, {
+  return request('/goals', {
     headers: getHeaders()
   })
-
-  return res.json()
 }
 
 export async function createGoal(data) {
-  const res = await fetch(`${API}/goals`, {
+  return request('/goals', {
     method: 'POST',
     headers: getHeaders(),
     body: JSON.stringify(data)
   })
-
-  return res.json()
 }
 
 export async function deleteGoal(id) {
-  await fetch(`${API}/goals/${id}`, {
+  return request(`/goals/${id}`, {
     method: 'DELETE',
     headers: getHeaders()
   })
@@ -122,19 +133,15 @@ export async function deleteGoal(id) {
 
 /* SALARIES */
 export async function getSalaries() {
-  const res = await fetch(`${API}/salaries`, {
+  return request('/salaries', {
     headers: getHeaders()
   })
-
-  return res.json()
 }
 
 export async function saveSalary(data) {
-  const res = await fetch(`${API}/salaries`, {
+  return request('/salaries', {
     method: 'POST',
     headers: getHeaders(),
     body: JSON.stringify(data)
   })
-
-  return res.json()
 }

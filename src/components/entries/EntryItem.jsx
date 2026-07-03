@@ -33,6 +33,7 @@ const Foreground = styled.div`
 const StyledEntryCard = styled(Card)`
   border: 1px solid ${({ tone, theme }) => {
     if (tone === 'salary') return 'rgba(34, 197, 94, 0.35)'
+    if (tone === 'income') return 'rgba(34, 197, 94, 0.35)'
     if (tone === 'investment') return 'rgba(124, 58, 237, 0.30)'
     if (tone === 'fixed') return 'rgba(37, 99, 235, 0.28)'
     return theme.colors.border
@@ -74,6 +75,7 @@ const Badge = styled.span`
   font-weight: 700;
   background: ${({ tone, theme }) => {
     if (tone === 'salary') return 'rgba(34, 197, 94, 0.12)'
+    if (tone === 'income') return 'rgba(34, 197, 94, 0.12)'
     if (tone === 'fixed') return 'rgba(37, 99, 235, 0.12)'
     if (tone === 'installment') return 'rgba(124, 58, 237, 0.12)'
     if (tone === 'investment') return 'rgba(124, 58, 237, 0.12)'
@@ -81,6 +83,7 @@ const Badge = styled.span`
   }};
   color: ${({ tone, theme }) => {
     if (tone === 'salary') return '#16a34a'
+    if (tone === 'income') return '#16a34a'
     if (tone === 'fixed') return '#2563eb'
     if (tone === 'installment') return '#7c3aed'
     if (tone === 'investment') return '#7c3aed'
@@ -99,6 +102,7 @@ const Amount = styled.strong`
   font-size: 18px;
   color: ${({ tone }) => {
     if (tone === 'salary') return '#16a34a'
+    if (tone === 'income') return '#16a34a'
     if (tone === 'investment') return '#7c3aed'
     return '#dc2626'
   }};
@@ -109,23 +113,6 @@ const Meta = styled.div`
   color: ${({ theme }) => theme.colors.textSoft};
   font-size: 14px;
   line-height: 1.45;
-`
-
-const Actions = styled.div`
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 14px;
-`
-
-const DangerButton = styled.button`
-  border: 0;
-  background: transparent;
-  color: #dc2626;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
 `
 
 const Overlay = styled.div`
@@ -205,6 +192,10 @@ function getItemTone(item) {
     return 'salary'
   }
 
+  if (item.type === 'income') {
+    return 'income'
+  }
+
   if (item.sourceType === 'fixed_cost') {
     return 'fixed'
   }
@@ -219,6 +210,10 @@ function getItemTone(item) {
 function getBadgeTone(item) {
   if (item.sourceType === 'salary') {
     return 'salary'
+  }
+
+  if (item.type === 'income') {
+    return 'income'
   }
 
   if (item.sourceType === 'fixed_cost') {
@@ -239,7 +234,7 @@ function getBadgeTone(item) {
 function getAmountLabel(item) {
   const tone = getItemTone(item)
 
-  if (tone === 'salary') {
+  if (tone === 'salary' || tone === 'income') {
     return `+ ${formatCurrency(item.displayAmount)}`
   }
 
@@ -259,6 +254,8 @@ function EntryItem({ item }) {
   const [dragging, setDragging] = useState(false)
   const [startX, setStartX] = useState(0)
   const [showModal, setShowModal] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const isSalary = item.sourceType === 'salary'
   const itemTone = getItemTone(item)
@@ -290,6 +287,7 @@ function EntryItem({ item }) {
       return
     }
 
+    setError('')
     setShowModal(true)
     resetSwipe()
   }
@@ -344,28 +342,46 @@ function EntryItem({ item }) {
     setOffset(0)
   }
 
-  function handleDeleteSingle() {
-    if (item.sourceType === 'fixed_cost') {
-      skipFixedCostMonth(item.originalId, selectedMonth)
-    } else {
-      if (item.isRecurring || item.isInstallment) {
-        skipRecurringEntryMonth(item.originalId, selectedMonth)
-      } else {
-        removeEntry(item.originalId)
-      }
-    }
+  async function handleDeleteSingle() {
+    try {
+      setLoading(true)
+      setError('')
 
-    closeDeleteModal()
+      if (item.sourceType === 'fixed_cost') {
+        await skipFixedCostMonth(item.originalId, selectedMonth)
+      } else {
+        if (item.isRecurring || item.isInstallment) {
+          await skipRecurringEntryMonth(item.originalId, selectedMonth)
+        } else {
+          await removeEntry(item.originalId)
+        }
+      }
+
+      closeDeleteModal()
+    } catch (err) {
+      setError(err.message || 'Não foi possível remover este item.')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  function handleDeleteAll() {
-    if (item.sourceType === 'fixed_cost') {
-      removeFixedCost(item.originalId)
-    } else {
-      removeEntry(item.originalId)
-    }
+  async function handleDeleteAll() {
+    try {
+      setLoading(true)
+      setError('')
 
-    closeDeleteModal()
+      if (item.sourceType === 'fixed_cost') {
+        await removeFixedCost(item.originalId)
+      } else {
+        await removeEntry(item.originalId)
+      }
+
+      closeDeleteModal()
+    } catch (err) {
+      setError(err.message || 'Não foi possível remover este item.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   function renderMeta() {
@@ -433,7 +449,6 @@ function EntryItem({ item }) {
 
             <Meta>{renderMeta()}</Meta>
 
-            
           </StyledEntryCard>
         </Foreground>
       </SwipeWrapper>
@@ -456,10 +471,11 @@ function EntryItem({ item }) {
                 <ModalText>
                   Deseja remover este lançamento de forma permanente?
                 </ModalText>
+                {error ? <ModalText>{error}</ModalText> : null}
 
                 <ModalActions>
-                  <ModalButton type="button" variant="danger" onClick={handleDeleteAll}>
-                    Sim, remover
+                  <ModalButton type="button" variant="danger" onClick={handleDeleteAll} disabled={loading}>
+                    {loading ? 'Removendo...' : 'Sim, remover'}
                   </ModalButton>
 
                   <ModalButton type="button" variant="secondary" onClick={closeDeleteModal}>
@@ -472,15 +488,16 @@ function EntryItem({ item }) {
             {deleteMode === 'recurring' && (
               <>
                 <ModalText>
-                  Esse lançamento é recorrente. Remover só este mês ainda é temporário no front. Remover a recorrência inteira já apaga de verdade no backend.
+                  Esse lançamento é recorrente. Você pode ocultar só este mês ou apagar a recorrência inteira.
                 </ModalText>
+                {error ? <ModalText>{error}</ModalText> : null}
 
                 <ModalActions>
-                  <ModalButton type="button" variant="danger" onClick={handleDeleteSingle}>
-                    Remover só este mês
+                  <ModalButton type="button" variant="danger" onClick={handleDeleteSingle} disabled={loading}>
+                    {loading ? 'Removendo...' : 'Remover só este mês'}
                   </ModalButton>
 
-                  <ModalButton type="button" onClick={handleDeleteAll}>
+                  <ModalButton type="button" onClick={handleDeleteAll} disabled={loading}>
                     Remover recorrência inteira
                   </ModalButton>
 
@@ -494,15 +511,16 @@ function EntryItem({ item }) {
             {deleteMode === 'installment' && (
               <>
                 <ModalText>
-                  Esse lançamento faz parte de um parcelamento. Remover só esta parcela ainda é temporário no front. Remover o parcelamento inteiro já apaga de verdade no backend.
+                  Esse lançamento faz parte de um parcelamento. Você pode ocultar só esta parcela ou apagar o parcelamento inteiro.
                 </ModalText>
+                {error ? <ModalText>{error}</ModalText> : null}
 
                 <ModalActions>
-                  <ModalButton type="button" variant="danger" onClick={handleDeleteSingle}>
-                    Remover só esta parcela
+                  <ModalButton type="button" variant="danger" onClick={handleDeleteSingle} disabled={loading}>
+                    {loading ? 'Removendo...' : 'Remover só esta parcela'}
                   </ModalButton>
 
-                  <ModalButton type="button" onClick={handleDeleteAll}>
+                  <ModalButton type="button" onClick={handleDeleteAll} disabled={loading}>
                     Remover parcelamento inteiro
                   </ModalButton>
 
@@ -516,15 +534,16 @@ function EntryItem({ item }) {
             {deleteMode === 'fixed' && (
               <>
                 <ModalText>
-                  Esse item é um custo fixo. Remover só este mês ainda é temporário no front. Remover o custo fixo inteiro já apaga de verdade no backend.
+                  Esse item é um custo fixo. Você pode ocultar só este mês ou apagar o custo fixo inteiro.
                 </ModalText>
+                {error ? <ModalText>{error}</ModalText> : null}
 
                 <ModalActions>
-                  <ModalButton type="button" variant="danger" onClick={handleDeleteSingle}>
-                    Remover só este mês
+                  <ModalButton type="button" variant="danger" onClick={handleDeleteSingle} disabled={loading}>
+                    {loading ? 'Removendo...' : 'Remover só este mês'}
                   </ModalButton>
 
-                  <ModalButton type="button" onClick={handleDeleteAll}>
+                  <ModalButton type="button" onClick={handleDeleteAll} disabled={loading}>
                     Remover custo fixo inteiro
                   </ModalButton>
 

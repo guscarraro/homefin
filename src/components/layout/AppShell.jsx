@@ -1,7 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
+import { FiRefreshCw } from 'react-icons/fi'
 import Header from './Header'
 import BottomNav from './BottomNav'
+import { useFinance } from '../../context/FinanceContext'
 
 const Wrapper = styled.div`
   min-height: 100vh;
@@ -11,19 +13,46 @@ const Wrapper = styled.div`
 `
 
 const PullIndicator = styled.div`
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
   text-align: center;
   font-size: 12px;
   color: ${({ theme }) => theme.colors.textSoft};
   padding: 6px 0;
 `
 
+const Spinner = styled(FiRefreshCw)`
+  animation: spin 0.9s linear infinite;
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+`
+
 function AppShell({ title, subtitle, showMonthSelector = false, children }) {
+  const { reloadFinanceData } = useFinance()
   const startY = useRef(0)
   const pulling = useRef(false)
+  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
+    async function refresh() {
+      try {
+        setRefreshing(true)
+        await reloadFinanceData()
+      } finally {
+        window.setTimeout(() => setRefreshing(false), 350)
+      }
+    }
+
     function onTouchStart(e) {
-      if (window.scrollY === 0) {
+      if (window.scrollY === 0 && !refreshing) {
         startY.current = e.touches[0].clientY
         pulling.current = true
       }
@@ -37,7 +66,7 @@ function AppShell({ title, subtitle, showMonthSelector = false, children }) {
 
       if (diff > 120) {
         pulling.current = false
-        window.location.reload()
+        refresh()
       }
     }
 
@@ -54,11 +83,20 @@ function AppShell({ title, subtitle, showMonthSelector = false, children }) {
       window.removeEventListener('touchmove', onTouchMove)
       window.removeEventListener('touchend', onTouchEnd)
     }
-  }, [])
+  }, [refreshing, reloadFinanceData])
 
   return (
     <Wrapper>
-      <PullIndicator>Puxe para atualizar</PullIndicator>
+      <PullIndicator aria-live="polite">
+        {refreshing ? (
+          <>
+            <Spinner size={14} />
+            Atualizando dados...
+          </>
+        ) : (
+          'Puxe para atualizar'
+        )}
+      </PullIndicator>
 
       <Header
         title={title}

@@ -10,6 +10,7 @@ function normalizeFixedCost(item) {
     dueDay: Number(item.due_day || 1),
     active: Boolean(item.active),
     category: item.category || 'Casa',
+    skippedMonths: item.skipped_months || [],
     createdAt: item.created_at
   }
 }
@@ -41,7 +42,8 @@ export async function createFixedCost(req, res) {
     amount: Number(req.body.amount || 0),
     due_day: Number(req.body.dueDay || 1),
     active: req.body.active !== undefined ? Boolean(req.body.active) : true,
-    category: req.body.category || 'Casa'
+    category: req.body.category || 'Casa',
+    skipped_months: req.body.skippedMonths || []
   }
 
   const { data, error } = await supabase
@@ -64,7 +66,8 @@ export async function updateFixedCost(req, res) {
     amount: req.body.amount !== undefined ? Number(req.body.amount) : undefined,
     due_day: req.body.dueDay !== undefined ? Number(req.body.dueDay) : undefined,
     active: req.body.active !== undefined ? Boolean(req.body.active) : undefined,
-    category: req.body.category
+    category: req.body.category,
+    skipped_months: req.body.skippedMonths
   }
 
   const cleanPayload = {}

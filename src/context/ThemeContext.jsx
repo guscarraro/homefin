@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useMemo, useState } from 'react'
 import { ThemeProvider } from 'styled-components'
 import { darkTheme, lightTheme } from '../styles/theme'
 import { useLocalStorage } from '../hooks/useLocalStorage'
@@ -9,13 +9,13 @@ export function ThemeProviderWrapper({ children }) {
   const [storedTheme, setStoredTheme] = useLocalStorage('homefin:theme', 'dark')
   const [mode, setMode] = useState(storedTheme)
 
-  function toggleTheme() {
+  const toggleTheme = useCallback(() => {
     const nextMode = mode === 'dark' ? 'light' : 'dark'
     setMode(nextMode)
     setStoredTheme(nextMode)
-  }
+  }, [mode, setStoredTheme])
 
-  const value = useMemo(() => ({ mode, toggleTheme }), [mode])
+  const value = useMemo(() => ({ mode, toggleTheme }), [mode, toggleTheme])
   const theme = mode === 'dark' ? darkTheme : lightTheme
 
   return (

@@ -11,9 +11,11 @@ import { addMonthsToMonthKey, getMonthKeyFromDate } from '../utils/date'
 import {
   getEntries,
   createEntry,
+  updateEntry,
   deleteEntry,
   getFixedCosts,
   createFixedCost,
+  updateFixedCost,
   deleteFixedCost,
   getGoals,
   createGoal,
@@ -260,7 +262,22 @@ export function FinanceProvider({ children }) {
     })
   }
 
-  function skipRecurringEntryMonth(entryId, monthKey) {
+  async function skipRecurringEntryMonth(entryId, monthKey) {
+    const entry = financeData.entries.find(item => item.id === entryId)
+
+    if (!entry) {
+      return
+    }
+
+    const skippedMonths = entry.skippedMonths ? [...entry.skippedMonths] : []
+
+    if (!skippedMonths.includes(monthKey)) {
+      skippedMonths.push(monthKey)
+    }
+
+    const updatedEntry = await updateEntry(entryId, { skippedMonths })
+    const normalizedUpdatedEntry = normalizeEntry(updatedEntry)
+
     setFinanceData(previous => {
       const nextEntries = []
 
@@ -270,23 +287,7 @@ export function FinanceProvider({ children }) {
           continue
         }
 
-        const skippedMonths = entry.skippedMonths ? [...entry.skippedMonths] : []
-        let alreadyExists = false
-
-        for (const skippedMonth of skippedMonths) {
-          if (skippedMonth === monthKey) {
-            alreadyExists = true
-          }
-        }
-
-        if (!alreadyExists) {
-          skippedMonths.push(monthKey)
-        }
-
-        nextEntries.push({
-          ...entry,
-          skippedMonths
-        })
+        nextEntries.push(normalizedUpdatedEntry)
       }
 
       return {
@@ -315,7 +316,22 @@ export function FinanceProvider({ children }) {
     })
   }
 
-  function skipFixedCostMonth(fixedCostId, monthKey) {
+  async function skipFixedCostMonth(fixedCostId, monthKey) {
+    const fixedCost = financeData.fixedCosts.find(item => item.id === fixedCostId)
+
+    if (!fixedCost) {
+      return
+    }
+
+    const skippedMonths = fixedCost.skippedMonths ? [...fixedCost.skippedMonths] : []
+
+    if (!skippedMonths.includes(monthKey)) {
+      skippedMonths.push(monthKey)
+    }
+
+    const updatedFixedCost = await updateFixedCost(fixedCostId, { skippedMonths })
+    const normalizedUpdatedFixedCost = normalizeFixedCost(updatedFixedCost)
+
     setFinanceData(previous => {
       const nextFixedCosts = []
 
@@ -325,23 +341,7 @@ export function FinanceProvider({ children }) {
           continue
         }
 
-        const skippedMonths = item.skippedMonths ? [...item.skippedMonths] : []
-        let alreadyExists = false
-
-        for (const skippedMonth of skippedMonths) {
-          if (skippedMonth === monthKey) {
-            alreadyExists = true
-          }
-        }
-
-        if (!alreadyExists) {
-          skippedMonths.push(monthKey)
-        }
-
-        nextFixedCosts.push({
-          ...item,
-          skippedMonths
-        })
+        nextFixedCosts.push(normalizedUpdatedFixedCost)
       }
 
       return {
@@ -395,39 +395,27 @@ export function FinanceProvider({ children }) {
     [financeData, selectedMonth]
   )
 
-  const value = useMemo(
-    () => ({
-      financeData,
-      selectedMonth,
-      setSelectedMonth,
-      visibleEntries,
-      addEntry,
-      saveMonthSalary,
-      addGoal,
-      addFixedCost,
-      removeEntry,
-      skipRecurringEntryMonth,
-      removeFixedCost,
-      skipFixedCostMonth,
-      removeGoal,
-      projection,
-      suggestions,
-      categoryTotals,
-      currentMonthInstallments,
-      loading,
-      reloadFinanceData
-    }),
-    [
-      financeData,
-      selectedMonth,
-      visibleEntries,
-      projection,
-      suggestions,
-      categoryTotals,
-      currentMonthInstallments,
-      loading
-    ]
-  )
+  const value = {
+    financeData,
+    selectedMonth,
+    setSelectedMonth,
+    visibleEntries,
+    addEntry,
+    saveMonthSalary,
+    addGoal,
+    addFixedCost,
+    removeEntry,
+    skipRecurringEntryMonth,
+    removeFixedCost,
+    skipFixedCostMonth,
+    removeGoal,
+    projection,
+    suggestions,
+    categoryTotals,
+    currentMonthInstallments,
+    loading,
+    reloadFinanceData
+  }
 
   return <FinanceContext.Provider value={value}>{children}</FinanceContext.Provider>
 }

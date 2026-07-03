@@ -10,12 +10,17 @@ const Select = styled.select`
   appearance: none;
   width: 100%;
   height: 52px;
-  border-radius: 16px;
+  border-radius: 8px;
   border: 1px solid ${({ theme }) => theme.colors.border};
   background: ${({ theme }) => theme.colors.surfaceAlt};
   color: ${({ theme }) => theme.colors.text};
   padding: 0 42px 0 16px;
   outline: none;
+
+  &:focus {
+    border-color: ${({ theme }) => theme.colors.primary};
+    box-shadow: 0 0 0 3px ${({ theme }) => theme.colors.primarySoft};
+  }
 `
 
 const IconBox = styled.div`

@@ -75,7 +75,7 @@ function BalanceHero({ projection }) {
 
       <Grid>
         <Block>
-          <Label>Salário total</Label>
+          <Label>Receita total</Label>
           <Value>{formatCurrency(projection.salary)}</Value>
         </Block>
 

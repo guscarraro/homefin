@@ -10,7 +10,7 @@ const Wrapper = styled.nav`
   width: calc(100% - 24px);
   max-width: 520px;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 8px;
   background: ${({ theme }) => theme.colors.surface};
   border: 1px solid ${({ theme }) => theme.colors.border};
@@ -45,6 +45,7 @@ function BottomNav() {
       <NavItem to="/salaries"><FiDollarSign size={18} />Salários</NavItem>
       <NavItem to="/goals"><FiTarget size={18} />Metas</NavItem>
       <NavItem to="/entries"><FiList size={18} />Lista</NavItem>
+      <NavItem to="/settings"><FiSettings size={18} />Ajustes</NavItem>
     </Wrapper>
   )
 }

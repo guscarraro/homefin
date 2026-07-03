@@ -5,6 +5,7 @@ import SalariesPage from '../pages/SalariesPage'
 import GoalsPage from '../pages/GoalsPage'
 import EntriesPage from '../pages/EntriesPage'
 import SettingsPage from '../pages/SettingsPage'
+import LaunchPage from '../pages/LaunchPage'
 
 function AppRouter() {
   const token = localStorage.getItem('token')
@@ -16,6 +17,7 @@ function AppRouter() {
   return (
     <Routes>
       <Route path="/" element={<DashboardPage />} />
+      <Route path="/launch" element={<LaunchPage />} />
       <Route path="/salaries" element={<SalariesPage />} />
       <Route path="/goals" element={<GoalsPage />} />
       <Route path="/entries" element={<EntriesPage />} />

@@ -1,6 +1,7 @@
 export const ACCOUNTS = ['Nubank', 'Itaú', 'Bradesco', 'Inter', 'Caixa']
 
 export const CATEGORIES = [
+  'Receita',
   'Alimentação',
   'Mercado',
   'Combustível',
@@ -18,3 +19,7 @@ export const CATEGORIES = [
 ]
 
 export const PAYMENT_METHODS = ['Pix', 'Débito', 'Crédito', 'Dinheiro']
+
+export const EXPENSE_CATEGORIES = CATEGORIES.filter(
+  category => !['Receita', 'Investimento', 'Meta'].includes(category)
+)

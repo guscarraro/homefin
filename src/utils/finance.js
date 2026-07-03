@@ -60,6 +60,55 @@ function getSalaryForMonth(salaries, monthKey) {
   return total
 }
 
+function getIncomeOwner(note) {
+  const match = String(note || '').match(/\[incomeOwner:(gustavo|marccella)\]/)
+  return match ? match[1] : ''
+}
+
+function getPublicNote(note) {
+  return String(note || '').replace(/\s*\[incomeOwner:(gustavo|marccella)\]/, '').trim()
+}
+
+export function getMonthlyIncomeBreakdown(financeData, monthKey) {
+  const salary = (financeData.salaries || []).find(item => item.month === monthKey)
+  const fixedGustavo = Number(salary?.gustavo || 0)
+  const fixedMarccella = Number(salary?.marccella || 0)
+  let variableGustavo = 0
+  let variableMarccella = 0
+  let variableUnassigned = 0
+
+  const entriesForMonth = getEntriesForMonthView(financeData.entries || [], monthKey)
+
+  for (const entry of entriesForMonth) {
+    if (entry.type !== 'income') {
+      continue
+    }
+
+    const amount = Number(entry.visibleAmount || entry.amount || 0)
+    const owner = getIncomeOwner(entry.note)
+
+    if (owner === 'gustavo') {
+      variableGustavo += amount
+    } else if (owner === 'marccella') {
+      variableMarccella += amount
+    } else {
+      variableUnassigned += amount
+    }
+  }
+
+  return {
+    month: monthKey,
+    fixedGustavo,
+    fixedMarccella,
+    variableGustavo: Number(variableGustavo.toFixed(2)),
+    variableMarccella: Number(variableMarccella.toFixed(2)),
+    variableUnassigned: Number(variableUnassigned.toFixed(2)),
+    totalGustavo: Number((fixedGustavo + variableGustavo).toFixed(2)),
+    totalMarccella: Number((fixedMarccella + variableMarccella).toFixed(2)),
+    total: Number((fixedGustavo + fixedMarccella + variableGustavo + variableMarccella + variableUnassigned).toFixed(2))
+  }
+}
+
 function hasSkippedMonth(item, monthKey) {
   if (!item?.skippedMonths?.length) {
     return false
@@ -201,12 +250,18 @@ function getMonthlyGoalsNeed(goals) {
 }
 
 function getTotals(entriesForMonth, fixedCosts, monthKey) {
+  let income = 0
   let variableExpenses = 0
   let investments = 0
   let goalPayments = 0
 
   for (const entry of entriesForMonth) {
     const amount = Number(entry.visibleAmount || entry.amount || 0)
+
+    if (entry.type === 'income') {
+      income += amount
+      continue
+    }
 
     if (entry.type === 'investment') {
       investments += amount
@@ -223,6 +278,7 @@ function getTotals(entriesForMonth, fixedCosts, monthKey) {
   const fixedCostsTotal = getActiveFixedCostsTotal(fixedCosts, monthKey)
 
   return {
+    income: Number(income.toFixed(2)),
     fixedCosts: Number(fixedCostsTotal.toFixed(2)),
     variableExpenses: Number(variableExpenses.toFixed(2)),
     investments: Number(investments.toFixed(2)),
@@ -260,7 +316,7 @@ function buildAllCategoryBudgets(salary) {
   const categoriesToPlan = []
 
   for (const category of CATEGORIES) {
-    if (category === 'Investimento' || category === 'Meta') {
+    if (category === 'Receita' || category === 'Investimento' || category === 'Meta') {
       continue
     }
 
@@ -332,9 +388,9 @@ function getSuggestedInvestment(salary, fixedCosts, variableExpenses) {
 }
 
 export function buildMonthlyProjection(financeData, monthKey) {
-  const salary = getSalaryForMonth(financeData.salaries, monthKey)
   const entriesForMonth = getEntriesForMonthView(financeData.entries, monthKey)
   const totals = getTotals(entriesForMonth, financeData.fixedCosts || [], monthKey)
+  const salary = getSalaryForMonth(financeData.salaries, monthKey) + totals.income
   const monthlyGoalsNeed = getMonthlyGoalsNeed(financeData.goals || [])
 
   const investmentPlan = getSuggestedInvestment(
@@ -440,6 +496,7 @@ export function buildMonthlyProjection(financeData, monthKey) {
     month: monthKey,
     hasSalary: salary > 0,
     salary,
+    income: totals.income,
     expenses: totals.expenses,
     fixedCosts: totals.fixedCosts,
     variableExpenses: totals.variableExpenses,
@@ -733,12 +790,18 @@ export function getMonthlyEntriesList(financeData, monthKey) {
       ...entry,
       sourceType: 'entry',
       originalId: entry.id,
-      title: isGoalPayment ? 'Pagamento de meta' : entry.category || 'Geral',
-      displayNote: entry.note || 'Sem observação',
+      title: entry.type === 'income'
+        ? 'Receita recebida'
+        : isGoalPayment
+          ? 'Pagamento de meta'
+          : entry.category || 'Geral',
+      displayNote: getPublicNote(entry.note) || 'Sem observação',
       displayAmount: Number(entry.visibleAmount || entry.amount || 0),
       displayDate: entry.date,
       entryKindLabel:
-        entry.type === 'investment'
+        entry.type === 'income'
+          ? 'Receita'
+          : entry.type === 'investment'
           ? 'Investimento'
           : isGoalPayment
             ? 'Pagamento de meta'

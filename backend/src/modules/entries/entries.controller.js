@@ -18,6 +18,7 @@ function normalizeEntry(item) {
     date: item.date,
     note: item.note || '',
     goalId: item.goal_id || null,
+    skippedMonths: item.skipped_months || [],
     createdAt: item.created_at
   }
 }
@@ -68,7 +69,8 @@ export async function createEntry(req, res) {
     is_recurring: Boolean(req.body.isRecurring),
     date: req.body.date,
     note: req.body.note || '',
-    goal_id: req.body.goalId || null
+    goal_id: req.body.goalId || null,
+    skipped_months: req.body.skippedMonths || []
   }
 
   const { data, error } = await supabase
@@ -99,7 +101,8 @@ export async function updateEntry(req, res) {
     is_recurring: req.body.isRecurring,
     date: req.body.date,
     note: req.body.note,
-    goal_id: req.body.goalId === undefined ? undefined : req.body.goalId
+    goal_id: req.body.goalId === undefined ? undefined : req.body.goalId,
+    skipped_months: req.body.skippedMonths
   }
 
   const cleanPayload = {}
