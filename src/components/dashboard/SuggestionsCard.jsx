@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react'
 import styled from 'styled-components'
 import {
   FiAlertTriangle,
@@ -30,6 +31,93 @@ const Section = styled.div`
 
 const SectionTitle = styled.h4`
   font-size: 16px;
+`
+
+const Header = styled.div`
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+
+  h3 {
+    margin-bottom: 4px;
+  }
+
+  p {
+    color: ${({ theme }) => theme.colors.textSoft};
+    line-height: 1.4;
+  }
+
+  @media (max-width: 520px) {
+    flex-direction: column;
+  }
+`
+
+const SelectWrap = styled.label`
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: ${({ theme }) => theme.colors.textSoft};
+  font-size: 12px;
+`
+
+const PeriodSelect = styled.select`
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  background: ${({ theme }) => theme.colors.surfaceAlt};
+  color: ${({ theme }) => theme.colors.text};
+  padding: 10px 12px;
+  font-weight: 700;
+  outline: none;
+
+  &:focus {
+    border-color: ${({ theme }) => theme.colors.primary};
+    box-shadow: 0 0 0 3px ${({ theme }) => theme.colors.primarySoft};
+  }
+`
+
+const FocusPanel = styled.div`
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 8px;
+  border: 1px solid ${({ toneColor }) => toneColor};
+  background: ${({ toneBackground }) => toneBackground};
+  margin-bottom: 14px;
+`
+
+const MetricGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+`
+
+const Metric = styled.div`
+  min-width: 0;
+  border-radius: 8px;
+  background: ${({ theme }) => theme.colors.surface};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  padding: 10px;
+`
+
+const MetricLabel = styled.div`
+  color: ${({ theme }) => theme.colors.textSoft};
+  font-size: 12px;
+  margin-bottom: 4px;
+`
+
+const MetricValue = styled.div`
+  font-size: 16px;
+  font-weight: 800;
 `
 
 const List = styled.div`
@@ -250,7 +338,88 @@ function getExceededPercent(item) {
   return Number((((item.spent - item.planned) / item.planned) * 100).toFixed(1))
 }
 
+function getRemainingDays(projection, period) {
+  if (period === 'daily') return 1
+  if (period === 'weekly') return Math.max(1, Number(projection.daysLeftInWeek || 1))
+  return Math.max(1, Number(projection.daysLeftInMonth || 1))
+}
+
+function getPeriodLabel(period) {
+  if (period === 'daily') return 'Hoje'
+  if (period === 'weekly') return 'Esta semana'
+  return 'Até o fim do mês'
+}
+
+function getPeriodCopy(period, projection) {
+  if (period === 'daily') {
+    return {
+      title: 'Régua diária',
+      text: `Para manter o mês sob controle, o limite de hoje fica em ${formatCurrency(projection.dailyLimit)}.`,
+      action: projection.dailyLimit > 0
+        ? 'Use esse valor como trava do dia. Se uma compra passar disso, jogue para outro dia ou corte uma categoria menos importante.'
+        : 'Hoje não há folga real. Evite novos gastos variáveis e registre apenas compromissos que não podem ser adiados.'
+    }
+  }
+
+  if (period === 'weekly') {
+    return {
+      title: 'Ritmo da semana',
+      text: `Faltam ${projection.daysLeftInWeek} dia(s) para fechar a semana. O teto recomendado é ${formatCurrency(projection.weeklyBudget)}.`,
+      action: projection.weeklyBudget > 0
+        ? 'Divida esse teto entre compras essenciais e deixe gastos de lazer para depois que as despesas fixas da semana estiverem pagas.'
+        : 'A semana já está apertada. Priorize mercado, transporte e contas obrigatórias; qualquer extra deve esperar.'
+    }
+  }
+
+  return {
+    title: 'Plano até o fim do mês',
+    text: `Faltam ${projection.daysLeftInMonth} dia(s). Depois dos compromissos, o saldo projetado é ${formatCurrency(projection.availableAfterGoals)}.`,
+    action: projection.availableAfterGoals >= 0
+      ? 'Mantenha os gastos variáveis dentro da média diária e separe primeiro investimento e metas para não consumir a sobra.'
+      : 'O mês fecha negativo nesse ritmo. Corte gastos sem teto, pause categorias estouradas e revise o que pode ser empurrado para o próximo mês.'
+  }
+}
+
+function getPeriodAmount(item, projection, period) {
+  if (period === 'daily') return getDailyAllowedAmount(item, projection)
+  if (period === 'weekly') return getWeeklyAllowedAmount(item, projection)
+  return Math.max(0, Number(item.remaining || 0))
+}
+
+function buildPeriodCategoryItems(projection, period) {
+  return (projection.categoryPlans || []).map(item => {
+    const exceededAmount = getExceededAmount(item)
+    const exceededPercent = getExceededPercent(item)
+    const isOverBudget = item.spent > item.planned && item.planned > 0
+    const isSpentWithoutBudget = item.spent > 0 && item.planned <= 0
+    const tone = isOverBudget || isSpentWithoutBudget ? 'danger' : item.tone || 'default'
+    const allowedAmount = getPeriodAmount(item, projection, period)
+    const remainingDays = getRemainingDays(projection, period)
+
+    return {
+      id: `${period}-category-${item.name}`,
+      title: item.name,
+      text: isOverBudget
+        ? `Teto mensal estourado em ${formatCurrency(exceededAmount)} (${exceededPercent}% acima). ${getPeriodLabel(period)} deve ficar sem novos gastos nessa categoria.`
+        : isSpentWithoutBudget
+          ? `Sem teto previsto, mas já consumiu ${formatCurrency(item.spent)}. Trate como gasto fora da curva e evite repetir.`
+          : `${getPeriodLabel(period)}: use até ${formatCurrency(allowedAmount)}. Isso equivale a ${formatCurrency(allowedAmount / remainingDays)} por dia dentro desse período.`,
+      meta: `Gasto: ${formatCurrency(item.spent)} de ${formatCurrency(item.planned)} no mês`,
+      icon: getToneIcon(item.tone),
+      tone,
+      priority: isOverBudget ? 0 : isSpentWithoutBudget ? 1 : item.remaining <= 0 ? 2 : 3
+    }
+  }).sort((first, second) => first.priority - second.priority)
+}
+
 function SuggestionsCard({ projection }) {
+  const [period, setPeriod] = useState('weekly')
+  const periodCopy = useMemo(() => getPeriodCopy(period, projection || {}), [period, projection])
+  const categoryItems = useMemo(
+    () => buildPeriodCategoryItems(projection || {}, period),
+    [period, projection]
+  )
+
   if (!projection?.hasSalary) {
     return (
       <Card>
@@ -260,48 +429,8 @@ function SuggestionsCard({ projection }) {
     )
   }
 
-  const weekItems = [
-    {
-      id: 'week-budget',
-      title: 'Quanto ainda pode gastar nesta semana',
-      text: `Faltam ${projection.daysLeftInWeek} dia(s) para fechar a semana. O ideal é não passar de ${formatCurrency(projection.weeklyBudget)} nesse período.`,
-      icon: 'calendar',
-      tone: 'default'
-    },
-    {
-      id: 'day-budget',
-      title: 'Quanto isso representa por dia até o fim do mês',
-      text: `Faltam ${projection.daysLeftInMonth} dia(s) para acabar o mês. Sua régua diária geral está em ${formatCurrency(projection.dailyLimit)} por dia.`,
-      icon: 'calendar',
-      tone: 'default'
-    }
-  ]
-
-  const weeklyCategoryItems = []
-
-  for (const item of projection.categoryPlans || []) {
-    const weeklyAllowed = getWeeklyAllowedAmount(item, projection)
-    const dailyAllowed = getDailyAllowedAmount(item, projection)
-    const exceededAmount = getExceededAmount(item)
-    const exceededPercent = getExceededPercent(item)
-    const isOverBudget = item.spent > item.planned && item.planned > 0
-    const isSpentWithoutBudget = item.spent > 0 && item.planned <= 0
-    const tone = isOverBudget || isSpentWithoutBudget ? 'danger' : item.tone || 'default'
-
-    weeklyCategoryItems.push({
-      id: `week-category-${item.name}`,
-      title: `${item.name} nesta semana`,
-      text: isOverBudget
-        ? `Você já passou ${formatCurrency(exceededAmount)} do teto mensal dessa categoria, ou ${exceededPercent}% acima do planejado. Nesta semana, o melhor movimento é zerar novos gastos nela.`
-        : isSpentWithoutBudget
-          ? `Essa categoria não tinha teto previsto neste mês, mas já consumiu ${formatCurrency(item.spent)}. Nesta semana, trate isso como gasto fora da curva e evite repetir.`
-          : `Até o fim desta semana, ainda dá para usar ${formatCurrency(weeklyAllowed)} nessa categoria. Isso representa cerca de ${formatCurrency(dailyAllowed)} por dia.`,
-      icon: getToneIcon(item.tone),
-      tone
-    })
-  }
-
-  const monthItems = [
+  const colors = getToneColors(projection.availableAfterGoals < 0 ? 'danger' : 'goal')
+  const contextItems = [
     {
       id: 'investment',
       title: 'Investimento mínimo',
@@ -332,138 +461,73 @@ function SuggestionsCard({ projection }) {
     }
   ]
 
-  const categoryItems = []
-
-  for (const item of projection.categoryPlans || []) {
-    const exceededAmount = getExceededAmount(item)
-    const exceededPercent = getExceededPercent(item)
-    const isOverBudget = item.spent > item.planned && item.planned > 0
-    const isSpentWithoutBudget = item.spent > 0 && item.planned <= 0
-    const tone = isOverBudget || isSpentWithoutBudget ? 'danger' : item.tone || 'default'
-
-    categoryItems.push({
-      id: `category-${item.name}`,
-      title: item.name,
-      text: isOverBudget
-        ? `Previsto: ${item.percent}% do salário • Planejado: ${formatCurrency(item.planned)} • Gasto atual: ${formatCurrency(item.spent)} • Você estourou ${formatCurrency(exceededAmount)}, ou ${exceededPercent}% acima do teto.`
-        : isSpentWithoutBudget
-          ? `Essa categoria ficou sem orçamento planejado neste mês, mas já consumiu ${formatCurrency(item.spent)}.`
-          : `Previsto: ${item.percent}% do salário • Planejado: ${formatCurrency(item.planned)} • Gasto atual: ${formatCurrency(item.spent)} • Ainda pode gastar no mês: ${formatCurrency(item.remaining)}.`,
-      icon: getToneIcon(item.tone),
-      tone
-    })
-  }
-
   return (
     <Card>
-      <h3>Sugestões e alertas</h3>
+      <Header>
+        <div>
+          <h3>Sugestões e alertas</h3>
+          <p>Escolha o horizonte e veja o limite recomendado com a ação mais importante.</p>
+        </div>
+
+        <SelectWrap>
+          Período
+          <PeriodSelect value={period} onChange={event => setPeriod(event.target.value)}>
+            <option value="daily">Diária</option>
+            <option value="weekly">Semanal</option>
+            <option value="monthly">Mensal</option>
+          </PeriodSelect>
+        </SelectWrap>
+      </Header>
+
+      <FocusPanel
+        toneColor={colors.color}
+        toneBackground={colors.background}
+      >
+        <IconBox
+          iconBackground={colors.iconBackground}
+          iconColor={colors.iconColor}
+        >
+          {getSuggestionIcon(period === 'monthly' ? 'target' : 'calendar')}
+        </IconBox>
+
+        <div>
+          <Title>{periodCopy.title}</Title>
+          <Text>{periodCopy.text}</Text>
+          <Text>{periodCopy.action}</Text>
+
+          <MetricGrid>
+            <Metric>
+              <MetricLabel>Hoje</MetricLabel>
+              <MetricValue>{formatCurrency(projection.dailyLimit)}</MetricValue>
+            </Metric>
+            <Metric>
+              <MetricLabel>Semana</MetricLabel>
+              <MetricValue>{formatCurrency(projection.weeklyBudget)}</MetricValue>
+            </Metric>
+            <Metric>
+              <MetricLabel>Fim do mês</MetricLabel>
+              <MetricValue>{formatCurrency(projection.availableAfterGoals)}</MetricValue>
+            </Metric>
+          </MetricGrid>
+        </div>
+      </FocusPanel>
 
       <Section>
-        <SectionTitle>Visão da semana</SectionTitle>
-
-        <List>
-          {weekItems.map(item => {
-            const colors = getToneColors(item.tone)
-
-            return (
-              <Item
-                key={item.id}
-                color={colors.color}
-                background={colors.background}
-              >
-                <IconBox
-                  iconBackground={colors.iconBackground}
-                  iconColor={colors.iconColor}
-                >
-                  {getSuggestionIcon(item.icon)}
-                </IconBox>
-
-                <div>
-                  <Title>{item.title}</Title>
-                  <Text>{item.text}</Text>
-                </div>
-              </Item>
-            )
-          })}
-        </List>
-      </Section>
-
-      <Section>
-        <SectionTitle>Quanto ainda pode gastar por categoria nesta semana</SectionTitle>
-
-        <List>
-          {weeklyCategoryItems.map(item => {
-            const colors = getToneColors(item.tone)
-
-            return (
-              <Item
-                key={item.id}
-                color={colors.color}
-                background={colors.background}
-              >
-                <IconBox
-                  iconBackground={colors.iconBackground}
-                  iconColor={colors.iconColor}
-                >
-                  {getSuggestionIcon(item.icon)}
-                </IconBox>
-
-                <div>
-                  <Title>{item.title}</Title>
-                  <Text>{item.text}</Text>
-                </div>
-              </Item>
-            )
-          })}
-        </List>
-      </Section>
-
-      <Section>
-        <SectionTitle>Visão do mês</SectionTitle>
-
-        <List>
-          {monthItems.map(item => {
-            const colors = getToneColors(item.tone)
-
-            return (
-              <Item
-                key={item.id}
-                color={colors.color}
-                background={colors.background}
-              >
-                <IconBox
-                  iconBackground={colors.iconBackground}
-                  iconColor={colors.iconColor}
-                >
-                  {getSuggestionIcon(item.icon)}
-                </IconBox>
-
-                <div>
-                  <Title>{item.title}</Title>
-                  <Text>{item.text}</Text>
-                </div>
-              </Item>
-            )
-          })}
-        </List>
-      </Section>
-
-      <Section>
-        <SectionTitle>Categorias do mês</SectionTitle>
+        <SectionTitle>Limite por categoria</SectionTitle>
 
         <List>
           {categoryItems.map(item => {
-            const colors = getToneColors(item.tone)
+            const itemColors = getToneColors(item.tone)
 
             return (
               <Item
                 key={item.id}
-                color={colors.color}
-                background={colors.background}
+                color={itemColors.color}
+                background={itemColors.background}
               >
                 <IconBox
-                  iconBackground={colors.iconBackground}
-                  iconColor={colors.iconColor}
+                  iconBackground={itemColors.iconBackground}
+                  iconColor={itemColors.iconColor}
                 >
                   {getSuggestionIcon(item.icon)}
                 </IconBox>
@@ -471,12 +535,45 @@ function SuggestionsCard({ projection }) {
                 <div>
                   <Title>{item.title}</Title>
                   <Text>{item.text}</Text>
+                  <Text>{item.meta}</Text>
                 </div>
               </Item>
             )
           })}
         </List>
       </Section>
+
+      {period === 'monthly' && (
+        <Section>
+          <SectionTitle>Compromissos do mês</SectionTitle>
+
+          <List>
+            {contextItems.map(item => {
+              const itemColors = getToneColors(item.tone)
+
+              return (
+                <Item
+                  key={item.id}
+                  color={itemColors.color}
+                  background={itemColors.background}
+                >
+                  <IconBox
+                    iconBackground={itemColors.iconBackground}
+                    iconColor={itemColors.iconColor}
+                  >
+                    {getSuggestionIcon(item.icon)}
+                  </IconBox>
+
+                  <div>
+                    <Title>{item.title}</Title>
+                    <Text>{item.text}</Text>
+                  </div>
+                </Item>
+              )
+            })}
+          </List>
+        </Section>
+      )}
     </Card>
   )
 }

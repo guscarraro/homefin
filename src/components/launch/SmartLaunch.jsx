@@ -126,6 +126,48 @@ function getInitialLaunchText() {
   return params.get('text') || params.get('launch') || ''
 }
 
+function getSpeechSynthesis() {
+  if (typeof window === 'undefined' || !window.speechSynthesis) {
+    return null
+  }
+
+  return window.speechSynthesis
+}
+
+function speakFeedback(message) {
+  const synthesis = getSpeechSynthesis()
+
+  if (!synthesis || !window.SpeechSynthesisUtterance) {
+    return
+  }
+
+  const utterance = new window.SpeechSynthesisUtterance(message)
+  const voices = synthesis.getVoices()
+  const portugueseVoice = voices.find(voice => voice.lang?.toLowerCase().startsWith('pt-br'))
+    || voices.find(voice => voice.lang?.toLowerCase().startsWith('pt'))
+
+  utterance.lang = 'pt-BR'
+  utterance.rate = 0.96
+  utterance.pitch = 1
+
+  if (portugueseVoice) {
+    utterance.voice = portugueseVoice
+  }
+
+  synthesis.cancel()
+  synthesis.speak(utterance)
+}
+
+function buildFailureMessage(reason, heardText = '') {
+  const cleanText = heardText.trim()
+
+  if (!cleanText) {
+    return reason
+  }
+
+  return `Não consegui lançar. Eu entendi: "${cleanText}". ${reason}`
+}
+
 function SmartLaunch() {
   const { addEntry } = useFinance()
   const initialLaunchText = useMemo(() => getInitialLaunchText(), [])
@@ -144,25 +186,42 @@ function SmartLaunch() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(
     initialLaunchText && !initialDraft
-      ? 'Não encontrei o valor. Exemplo: "mercado 83 no crédito".'
+      ? buildFailureMessage(
+        'Não encontrei o valor. Pode repetir dizendo algo como "mercado 83 no crédito".',
+        initialLaunchText
+      )
       : ''
   )
 
   const examples = useMemo(() => getSmartLaunchExamples(), [])
   const speechSupported = typeof window !== 'undefined' && Boolean(getSpeechRecognition())
 
-  const buildDraft = useCallback((value) => {
+  const fail = useCallback((reason, heardText = '', shouldSpeak = false) => {
+    const message = buildFailureMessage(reason, heardText)
+
+    setError(message)
+
+    if (shouldSpeak) {
+      speakFeedback(message)
+    }
+  }, [])
+
+  const buildDraft = useCallback((value, options = {}) => {
     const parsed = parseSmartLaunch(value)
 
     if (!parsed.amount) {
-      setError('Não encontrei o valor. Exemplo: "mercado 83 no crédito".')
+      fail(
+        'Não encontrei o valor. Pode repetir dizendo algo como "mercado 83 no crédito".',
+        value,
+        options.speak
+      )
       setDraft(null)
       return
     }
 
     setError('')
     setDraft(parsed)
-  }, [])
+  }, [fail])
 
   useEffect(() => {
     if (!initialLaunchText) {
@@ -172,15 +231,26 @@ function SmartLaunch() {
     window.history.replaceState({}, '', window.location.pathname)
   }, [initialLaunchText])
 
+  useEffect(() => {
+    if (!initialLaunchText || initialDraft) {
+      return
+    }
+
+    speakFeedback(buildFailureMessage(
+      'Não encontrei o valor. Pode repetir dizendo algo como "mercado 83 no crédito".',
+      initialLaunchText
+    ))
+  }, [initialDraft, initialLaunchText])
+
   function handleSubmit(event) {
     event.preventDefault()
 
     if (!text.trim()) {
-      setError('Digite ou fale o lançamento.')
+      fail('Digite ou fale o lançamento para eu conseguir salvar.', '', true)
       return
     }
 
-    buildDraft(text)
+    buildDraft(text, { speak: true })
   }
 
   function handleListen() {
@@ -201,7 +271,7 @@ function SmartLaunch() {
 
     recognition.onerror = () => {
       setListening(false)
-      setError('Não consegui ouvir agora. Digite a frase no campo.')
+      fail('Não consegui ouvir agora. Pode repetir ou digitar a frase no campo.', '', true)
     }
 
     recognition.onend = () => {
@@ -211,7 +281,7 @@ function SmartLaunch() {
     recognition.onresult = event => {
       const transcript = event.results?.[0]?.[0]?.transcript || ''
       setText(transcript)
-      buildDraft(transcript)
+      buildDraft(transcript, { speak: true })
     }
 
     recognition.start()
@@ -243,7 +313,11 @@ function SmartLaunch() {
       setText('')
       setDraft(null)
     } catch (err) {
-      setError(err.message || 'Não foi possível salvar esse lançamento.')
+      fail(
+        err.message || 'Não foi possível salvar esse lançamento.',
+        draft.note,
+        true
+      )
     } finally {
       setLoading(false)
     }
@@ -310,7 +384,7 @@ function SmartLaunch() {
         </Preview>
       ) : null}
 
-      {error ? <Feedback>{error}</Feedback> : null}
+      {error ? <Feedback role="alert" aria-live="assertive">{error}</Feedback> : null}
     </Wrapper>
   )
 }
